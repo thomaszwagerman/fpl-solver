@@ -56,8 +56,8 @@ To get the FPL Squad Optimizer running on your local machine, follow these steps
 1.  **Clone the Repository (if applicable):**
 
     ```bash
-    git clone <your-repo-url>
-    cd <your-repo-directory>
+    git clone git@github.com:thomaszwagerman/fpl-solver.git
+    cd fpl-solver
     ```
 
     (If you don't have a repo, just ensure all three `.py` files are in the same directory.)
@@ -69,11 +69,11 @@ To get the FPL Squad Optimizer running on your local machine, follow these steps
     source venv/bin/activate
     ```
 
-3.  **Install Dependencies:**
-    This project requires `pandas` for data handling and `PuLP` for the optimization.
+3.  **Install locally:**
+    Install `fpl-solver` locally:
 
     ```bash
-    pip install pandas pulp requests
+    pip install .
     ```
 
 
