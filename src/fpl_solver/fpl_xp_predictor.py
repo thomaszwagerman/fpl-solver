@@ -15,12 +15,12 @@ Improvements in this version:
 - Inclusion of Defensive Contribution Points for 2025/26 season (using heuristic probabilities)
 - More aggressive regression for players with very low total minutes played.
 - Calculates Expected Points over multiple upcoming gameweeks.
-- FIX: Corrected KeyError for 'id' when calculating multi-gameweek xP.
-- NEW: Integrates Fixture Difficulty Rating (FDR) into strength calculations.
-- NEW: More granular Expected Minutes prediction based on historical average minutes per appearance.
-- FIX: Corrected typo 'defense_defense_home' to 'defense_strength'.
-- NEW: Further refined Expected Minutes logic to better handle very low/zero minute players.
-- NEW: Configurations moved to fpl_config.py.
+- Corrected KeyError for 'id' when calculating multi-gameweek xP.
+- Integrates Fixture Difficulty Rating (FDR) into strength calculations.
+- More granular Expected Minutes prediction based on historical average minutes per appearance.
+- Corrected typo 'defense_defense_home' to 'defense_strength'.
+- Further refined Expected Minutes logic to better handle very low/zero minute players.
+- Configurations moved to fpl_config.py.
 """
 
 import math
