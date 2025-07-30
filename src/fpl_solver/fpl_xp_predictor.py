@@ -153,11 +153,6 @@ class FPLPredictor:
             minutes_played = player.get("minutes", 0)
             starts = player.get("starts", 0)  # Number of starts
 
-            # Define thresholds for minutes played for per-90 stats reliability
-            # These are now imported from fpl_config.py
-            # MIN_MINUTES_THRESHOLD = 1500 # Removed hardcoded value
-            # VERY_LOW_MINUTES_THRESHOLD = 450 # Removed hardcoded value
-
             # Initialize per-90 stats
             goals_per_90 = 0.0
             assists_per_90 = 0.0
@@ -275,10 +270,10 @@ class FPLPredictor:
                 "finished": fixture["finished"],  # Keep finished status
                 "home_team_difficulty": fixture[
                     "team_h_difficulty"
-                ],  # NEW: FDR for home team
+                ],
                 "away_team_difficulty": fixture[
                     "team_a_difficulty"
-                ],  # NEW: FDR for away team
+                ],
             }
         print("Real FPL data loaded successfully.")
 
