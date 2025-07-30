@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "fpl-optimizer"
+version = "0.1.0"
+authors = [
+  { name="Your Name", email="your.email@example.com" },
+]
+description = "A Python package for optimizing Fantasy Premier League (FPL) squad selection using Integer Linear Programming."
+readme = "README.md"
+requires-python = ">=3.8"
+keywords = ["fpl", "fantasy-premier-league", "optimization", "pulp", "sports-analytics"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Topic :: Scientific/Engineering :: Mathematics",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+]
+dependencies = [
+    "pandas>=1.0.0",
+    "PuLP>=2.6.0",
+]
+
+[project.urls]
+"Homepage" = "https://github.com/yourusername/fpl-optimizer" # Replace with your GitHub URL
+"Bug Tracker" = "https://github.com/yourusername/fpl-optimizer/issues" # Replace with your GitHub URL
+
+[tool.setuptools.packages.find]
+where = ["src"] # Search for packages in the 'src' directory
