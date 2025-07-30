@@ -156,4 +156,4 @@ Team B    2
 
 * **Transfer Optimization:** Add functionality to suggest optimal transfers week-to-week, considering free transfers and hits.
 
-* **Chip Uses:** Incorporate more historical data trends for better xP prediction.
+* **Chip Uses:** Chip usage is currently not a feature.
