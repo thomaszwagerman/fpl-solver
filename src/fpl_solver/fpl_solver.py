@@ -177,6 +177,14 @@ class FPLOptimizer:
             )
             total_objective_points.append(base_points_expression_gw)
 
+            # ADDED: Regular Captaincy points (additional 1x for captain)
+            captain_points_bonus_gw = lpSum(
+                self.player_data.loc[i, "expected_points_by_gw"][gw_actual]
+                * captain_var[i][w]
+                for i in self.player_data.index
+            )
+            total_objective_points.append(captain_points_bonus_gw)
+
             # Define auxiliary variables and constraints for chips for each gameweek
             for i in self.player_data.index:
                 # Use gameweek-specific player xP for chip calculations
@@ -217,19 +225,19 @@ class FPLOptimizer:
                 )
 
                 # Triple Captain auxiliary variables and constraints
+                # MODIFIED: Changed player_xp * 2 to player_xp to reflect additional 1x bonus
                 self.problem += (
-                    actual_triple_captain_bonus[i][w]
-                    <= player_xp * 2 * captain_var[i][w],
+                    actual_triple_captain_bonus[i][w] <= player_xp * captain_var[i][w],
                     f"TripleCaptain_Contr_1_{i}_{w}",
                 )
                 self.problem += (
                     actual_triple_captain_bonus[i][w]
-                    <= player_xp * 2 * use_triple_captain[w],
+                    <= player_xp * use_triple_captain[w],
                     f"TripleCaptain_Contr_2_{i}_{w}",
                 )
                 self.problem += (
                     actual_triple_captain_bonus[i][w]
-                    >= player_xp * 2 * (captain_var[i][w] + use_triple_captain[w] - 1),
+                    >= player_xp * (captain_var[i][w] + use_triple_captain[w] - 1),
                     f"TripleCaptain_Contr_3_{i}_{w}",
                 )
                 self.problem += (

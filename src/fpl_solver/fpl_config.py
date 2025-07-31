@@ -59,9 +59,9 @@ MAX_PLAYERS_PER_TEAM = (
 # Maximum number of times each chip can be used within the OPTIMIZATION_GAMEWEEKS horizon
 CHIP_ALLOWANCES = {
     "free_hit": 0,
-    "wildcard": 1,
+    "wildcard": 0,
     "bench_boost": 0,
-    "triple_captain": 0,
+    "triple_captain": 1,
 }
 
 # --- Transfer Rules (New) ---
