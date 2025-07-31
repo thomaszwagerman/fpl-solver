@@ -22,8 +22,8 @@ classifiers = [
 ]
 dependencies = [
     "pandas>=1.0.0",
-    "PuLP>=2.6.0",
-    "requests"
+    "requests",
+    "ortools"
 ]
 
 [project.urls]
