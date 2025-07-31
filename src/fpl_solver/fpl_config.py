@@ -1,3 +1,5 @@
+# fpl_config.py
+
 """
 fpl_config.py
 
@@ -18,6 +20,8 @@ FPL_POINTS = {
     "yellow_card_deduction": -1,
     "red_card_deduction": -3,
     "penalty_save_points": 5,
+    "own_goal_deduction": -2,  # Added missing key
+    "penalty_miss_deduction": -2,  # Added missing key
     # Bonus points factor is now more of a scaling for expected BPS score
     "bonus_points_scaling_factor": 0.005,  # A small factor to convert BPS score to expected bonus points
     # Defensive Contribution Points for 2025/26 season
@@ -45,7 +49,7 @@ DEFAULT_SUB_MINUTES = 30.0
 DEFAULT_UNKNOWN_PLAYER_MINUTES = 10.0
 
 # --- Solver Configuration ---
-OPTIMIZATION_GAMEWEEKS = 1  # Number of upcoming gameweeks to optimize for
+OPTIMIZATION_GAMEWEEKS = 3  # Number of upcoming gameweeks to optimize for
 BUDGET = 100.0  # Total budget for the squad in millions of pounds
 MAX_PLAYERS_PER_TEAM = (
     3  # Maximum number of players allowed from any single Premier League team
@@ -54,8 +58,8 @@ MAX_PLAYERS_PER_TEAM = (
 # --- Chip Configuration (New) ---
 # Maximum number of times each chip can be used within the OPTIMIZATION_GAMEWEEKS horizon
 CHIP_ALLOWANCES = {
-    "free_hit": 0,  # Typically 1 per season, often used for specific GWs, set to 0 if not considering
-    "wildcard": 0,  # Typically 2 per season, strategic, set to 0 if not considering
-    "bench_boost": 1,  # Typically 1 per season
-    "triple_captain": 0,  # Typically 1 per season
+    "free_hit": 0,
+    "wildcard": 1,
+    "bench_boost": 0,
+    "triple_captain": 0,
 }
