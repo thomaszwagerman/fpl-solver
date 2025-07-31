@@ -1,5 +1,3 @@
-# fpl_xp_predictor.py
-
 import math
 import requests
 import time

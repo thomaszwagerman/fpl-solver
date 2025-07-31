@@ -1,5 +1,3 @@
-# fpl_config.py
-
 """
 fpl_config.py
 
