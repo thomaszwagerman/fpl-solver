@@ -47,7 +47,7 @@ DEFAULT_SUB_MINUTES = 30.0
 DEFAULT_UNKNOWN_PLAYER_MINUTES = 10.0
 
 # --- Solver Configuration ---
-OPTIMIZATION_GAMEWEEKS = 38  # Number of upcoming gameweeks to optimize for
+OPTIMIZATION_GAMEWEEKS = 1  # Number of upcoming gameweeks to optimize for
 BUDGET = 100.0  # Total budget for the squad in millions of pounds
 MAX_PLAYERS_PER_TEAM = (
     3  # Maximum number of players allowed from any single Premier League team

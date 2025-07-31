@@ -11,16 +11,12 @@ Improvements in this version:
 - Expected Saves for Goalkeepers
 - More refined Bonus Points proxy using BPS data
 - Basic inclusion of minor negative events (yellow/red cards, own goals, penalty misses)
-- Consistent position mapping (GKP -> GK)
 - Inclusion of Defensive Contribution Points for 2025/26 season (using heuristic probabilities)
-- More aggressive regression for players with very low total minutes played.
+- Aggressive regression for players with very low total minutes played.
 - Calculates Expected Points over multiple upcoming gameweeks.
-- Corrected KeyError for 'id' when calculating multi-gameweek xP.
 - Integrates Fixture Difficulty Rating (FDR) into strength calculations.
 - More granular Expected Minutes prediction based on historical average minutes per appearance.
-- Corrected typo 'defense_defense_home' to 'defense_strength'.
 - Further refined Expected Minutes logic to better handle very low/zero minute players.
-- Configurations moved to fpl_config.py.
 """
 
 import math
@@ -31,14 +27,14 @@ from datetime import datetime
 # Import configurations from the new config file
 from fpl_config import (
     FPL_POINTS,
-    MIN_MINUTES_THRESHOLD,  # Imported from config
-    VERY_LOW_MINUTES_THRESHOLD,  # Imported from config
-    YELLOW_CARD_PROB,  # Imported from config
-    RED_CARD_PROB,  # Imported from config
-    PENALTY_MISS_PROB,  # Imported from config
-    OWN_GOAL_PROB,  # Imported from config
-    DEFAULT_SUB_MINUTES,  # Imported from config
-    DEFAULT_UNKNOWN_PLAYER_MINUTES,  # Imported from config
+    MIN_MINUTES_THRESHOLD,
+    VERY_LOW_MINUTES_THRESHOLD,
+    YELLOW_CARD_PROB,
+    RED_CARD_PROB,
+    PENALTY_MISS_PROB,
+    OWN_GOAL_PROB,
+    DEFAULT_SUB_MINUTES,
+    DEFAULT_UNKNOWN_PLAYER_MINUTES,
 )
 
 
@@ -61,7 +57,6 @@ class FPLPredictor:
             raise ValueError("gameweeks_to_predict must be a positive integer.")
         self.gameweeks_to_predict = gameweeks_to_predict
 
-        # FPL Point System is now loaded from fpl_config.py
         self.fpl_points = FPL_POINTS
 
         self.players_data = {}
@@ -221,14 +216,14 @@ class FPLPredictor:
                         expected_minutes = (
                             avg_minutes_per_start
                             if avg_minutes_per_start > 0
-                            else DEFAULT_UNKNOWN_PLAYER_MINUTES  # Now uses config value
+                            else DEFAULT_UNKNOWN_PLAYER_MINUTES
                         )
                 else:  # If chance_of_playing_next_round is None, assume 90 minutes (regular starter default)
                     # Fallback to DEFAULT_UNKNOWN_PLAYER_MINUTES if avg_minutes_per_start is 0
                     expected_minutes = (
                         avg_minutes_per_start
                         if avg_minutes_per_start > 0
-                        else DEFAULT_UNKNOWN_PLAYER_MINUTES  # Now uses config value
+                        else DEFAULT_UNKNOWN_PLAYER_MINUTES
                     )
 
             # Ensure expected_minutes doesn't exceed 90 or go negative
@@ -241,9 +236,9 @@ class FPLPredictor:
                 "position": position_short,
                 "goals_per_90": goals_per_90,
                 "assists_per_90": assists_per_90,
-                "saves_per_90": saves_per_90,  # Added for GKs
-                "bps_per_90": bps_per_90,  # Added for bonus points proxy
-                "expected_minutes": expected_minutes,  # Updated with granular logic
+                "saves_per_90": saves_per_90,
+                "bps_per_90": bps_per_90,
+                "expected_minutes": expected_minutes,
                 "form": float(player.get("form", 0.0)),
                 "status": player.get("status", "a"),
                 "cost_pence": player.get("now_cost", 0),
@@ -267,7 +262,7 @@ class FPLPredictor:
                 "home_advantage_factor": 1.1,
                 "kickoff_time": fixture["kickoff_time"],
                 "event": fixture["event"],  # Gameweek ID
-                "finished": fixture["finished"],  # Keep finished status
+                "finished": fixture["finished"],
                 "home_team_difficulty": fixture[
                     "team_h_difficulty"
                 ],
@@ -514,7 +509,6 @@ class FPLPredictor:
 
         # 7. Minor Negative Events (simple probabilities)
         # These are very rough estimates and would ideally be data-driven or more complex.
-        # Probabilities are now loaded from fpl_config.py
 
         # Yellow Card
         xp += YELLOW_CARD_PROB * self.fpl_points["yellow_card_deduction"]
