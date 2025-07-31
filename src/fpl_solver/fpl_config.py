@@ -88,3 +88,19 @@ EXCLUDED_PLAYERS_BY_TEAM_AND_POSITION = [
     # Example: Exclude all forwards from Arsenal
     # {"team": "Arsenal", "position": "FWD"}
 ]
+
+# --- Enforced Player Configuration ---
+# List of player IDs to enforce in the squad for the entire optimization horizon.
+ENFORCED_PLAYERS_BY_ID = []  # Example: [101, 202]
+
+# List of player full names (case-sensitive) to enforce in the squad.
+ENFORCED_PLAYERS_BY_NAME = ["Erling Haaland"]  # Example: ["Mohamed Salah", "Erling Haaland"]
+
+# List of dictionaries, each specifying a team and position to enforce at least one player from.
+# This ensures that if you, for example, want at least one Arsenal defender, you can specify it.
+ENFORCED_PLAYERS_BY_TEAM_AND_POSITION = [
+    # Example: Enforce at least one defender from Liverpool
+    # {"team": "Liverpool", "position": "DEF", "min_players": 1},
+    # Example: Enforce at least two midfielders from Man City
+    # {"team": "Man City", "position": "MID", "min_players": 2}
+]
