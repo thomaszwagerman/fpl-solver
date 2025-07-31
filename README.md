@@ -1,10 +1,16 @@
 # FPL Squad Optimizer
 
-This project provides a Python-based solution to optimize your Fantasy Premier League (FPL) squad selection using Integer Linear Programming (ILP). It fetches real-time player, team, and fixture data from the official FPL API, calculates Expected Points (xP) for all players, and then uses an optimization algorithm to build the highest-scoring 15-player squad within a specified budget and team limits.
+This project provides a Python-based solution to optimize Fantasy Premier League (FPL) squad selection using Integer Linear Programming (ILP). It fetches player, team, and fixture data from the official FPL API, calculates Expected Points (xP) for all players, and then uses an optimization algorithm to build the highest-scoring 15-player squad within a specified budget and team limits.
+
+This project aims to provide a **free and open-source** xP prediction algorithm, that is directly
+integrated with a solver. It only uses freely available data from the FPL API.
+
+This has obvious limitations compared to algorithms and solvers which can use pay-walled data (such as Opta, FFH), but 
+we give the user flexibility to adjust the algorithm using a configuration file.
 
 ## ✨ Features
 
-* **Real-time FPL Data Integration:** Fetches up-to-date player, team, and fixture information directly from the official FPL API.
+* **FPL Data Integration:** Fetches up-to-date player, team, and fixture information directly from the official FPL API.
 
 * **Expected Points (xP) Prediction:** Calculates a player's expected points based on historical performance, team strengths, opponent difficulty (Fixture Difficulty Rating - FDR), and expected minutes played.
 
@@ -12,13 +18,7 @@ This project provides a Python-based solution to optimize your Fantasy Premier L
 
 * **Multi-Gameweek Optimization:** Optimize your squad over multiple upcoming gameweeks to plan for future fixtures.
 
-* **Budget Constraints:** Ensures the selected squad adheres to your FPL budget.
-
-* **Team Limits:** Respects the FPL rule of a maximum number of players from any single Premier League team.
-
-* **Position Requirements:** Automatically selects the correct number of Goalkeepers, Defenders, Midfielders, and Forwards.
-
-* **Configurable Parameters:** Easily adjust FPL scoring rules, xP thresholds, budget, and team limits via a dedicated configuration file.
+* **Configurable Parameters:** Easily adjust probabilities, low-minute penalties, chip usage, player exclusion, xP thresholds, budget, and team limits via a dedicated configuration file.
 
 ## 🚀 How It Works
 
@@ -34,7 +34,7 @@ The project is structured into three main components:
 
     * Processing team and fixture data, including calculating team strengths and incorporating FDR.
 
-    * Calculating each player's Expected Points (xP) for upcoming gameweeks. This involves logic for goals, assists, clean sheets, saves (for GKs), bonus points (using BPS as a proxy), and even minor negative events like cards.
+    * Calculating each player's Expected Points (xP) for upcoming gameweeks. This involves logic for goals, assists, clean sheets, saves (for GKs), bonus points (using BPS as a proxy), and minor negative events like cards.
 
     * Crucially, it includes refined logic for `expected_minutes` to accurately assess playing time, especially for players with limited past appearances.
 
@@ -59,8 +59,6 @@ To get the FPL Squad Optimizer running on your local machine, follow these steps
     git clone git@github.com:thomaszwagerman/fpl-solver.git
     cd fpl-solver
     ```
-
-    (If you don't have a repo, just ensure all three `.py` files are in the same directory.)
 
 2.  **Create a Virtual Environment (Recommended):**
 
