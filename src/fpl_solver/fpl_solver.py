@@ -1,4 +1,3 @@
-# fpl_solver.py
 import pandas as pd
 from pulp import *
 import sys
@@ -13,9 +12,9 @@ from fpl_config import (
     BUDGET,
     MAX_PLAYERS_PER_TEAM,
     CHIP_ALLOWANCES,
-    INITIAL_FREE_TRANSFERS,  # New
-    MAX_FREE_TRANSFERS_SAVED,  # New
-    POINTS_PER_HIT,  # New
+    INITIAL_FREE_TRANSFERS,
+    MAX_FREE_TRANSFERS_SAVED,
+    POINTS_PER_HIT,
 )
 
 
@@ -52,7 +51,7 @@ class FPLOptimizer:
         self.selected_squad_history = {}  # To store squad for each gameweek
         self.total_cost = 0
         self.total_expected_points = 0
-        self.total_transfer_hits = 0  # New attribute to store total hits
+        self.total_transfer_hits = 0
 
     def solve(
         self,
@@ -111,7 +110,6 @@ class FPLOptimizer:
             LpBinary,
         )
 
-        # NEW: Transfer rule variables
         # Total transfers made in a gameweek (absolute count)
         transfers_made = LpVariable.dicts(
             "Transfers_Made", range(1, num_gameweeks), 0, None, LpInteger
@@ -122,7 +120,7 @@ class FPLOptimizer:
             range(num_gameweeks),
             0,
             MAX_FREE_TRANSFERS_SAVED + 1,
-            LpInteger,  # Max 2 free transfers
+            LpInteger,
         )
         # Number of transfer hits taken in a gameweek
         transfer_hits = LpVariable.dicts(
@@ -177,7 +175,7 @@ class FPLOptimizer:
             )
             total_objective_points.append(base_points_expression_gw)
 
-            # ADDED: Regular Captaincy points (additional 1x for captain)
+            # Regular Captaincy points (additional 1x for captain)
             captain_points_bonus_gw = lpSum(
                 self.player_data.loc[i, "expected_points_by_gw"][gw_actual]
                 * captain_var[i][w]
@@ -225,7 +223,7 @@ class FPLOptimizer:
                 )
 
                 # Triple Captain auxiliary variables and constraints
-                # MODIFIED: Changed player_xp * 2 to player_xp to reflect additional 1x bonus
+                # Changed player_xp * 2 to player_xp to reflect additional 1x bonus
                 self.problem += (
                     actual_triple_captain_bonus[i][w] <= player_xp * captain_var[i][w],
                     f"TripleCaptain_Contr_1_{i}_{w}",
@@ -460,7 +458,7 @@ class FPLOptimizer:
             print("Optimization successful! Optimal solution found.")
 
             self.selected_squad_history = {}
-            self.total_transfer_hits = 0  # Reset for this run
+            self.total_transfer_hits = 0
             for w in range(num_gameweeks):
                 # The actual gameweek number (1-indexed)
                 gw_actual = current_gameweek_number_start + w
@@ -552,14 +550,14 @@ class FPLOptimizer:
                             for i in self.player_data.index
                         )
                     ),
-                    "transfers_in_count": transfers_in_gw,  # New
-                    "transfers_out_count": transfers_out_gw,  # New
+                    "transfers_in_count": transfers_in_gw,
+                    "transfers_out_count": transfers_out_gw,
                     "transfer_hits": hits_gw,  # New
                     "free_transfers_available_next_gw": (
                         int(round(free_transfers_available[w].varValue))
                         if w < num_gameweeks - 1
                         else 0
-                    ),  # New: free transfers available *after* this GW's transfers are made
+                    ),  # Free transfers available *after* this GW's transfers are made
                 }
 
             # Overall totals
@@ -824,7 +822,7 @@ class FPLOptimizer:
         )
         print(
             f"Total Transfer Hits Taken: {self.total_transfer_hits} (-{self.total_transfer_hits * POINTS_PER_HIT} points)"
-        )  # New
+        )
 
         print("\n--- Chip Usage Across Gameweeks ---")
         # Ensure consistent order by sorting gameweek keys

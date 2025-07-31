@@ -467,7 +467,6 @@ class FPLPredictor:
         team_fixtures_in_range = {team_code: [] for team_code in self.teams_data.keys()}
         for fixture_id, fixture_data in all_upcoming_fixtures_items:
             if fixture_data["event"] in target_gameweeks:
-                # Corrected keys: use team_h and team_a
                 home_team_code = fixture_data["team_h"]
                 away_team_code = fixture_data["team_a"]
 
