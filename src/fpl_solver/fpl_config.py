@@ -27,9 +27,7 @@ FPL_POINTS = {
 }
 
 # Define thresholds for minutes played for per-90 stats reliability
-MIN_MINUTES_THRESHOLD = (
-    2500  # Players must have played at least this many minutes for reliable per-90 stats
-)
+MIN_MINUTES_THRESHOLD = 2500  # Players must have played at least this many minutes for reliable per-90 stats
 VERY_LOW_MINUTES_THRESHOLD = (
     450  # Players below this will have their per-90 stats effectively zeroed out
 )
@@ -52,3 +50,12 @@ BUDGET = 100.0  # Total budget for the squad in millions of pounds
 MAX_PLAYERS_PER_TEAM = (
     3  # Maximum number of players allowed from any single Premier League team
 )
+
+# --- Chip Configuration (New) ---
+# Maximum number of times each chip can be used within the OPTIMIZATION_GAMEWEEKS horizon
+CHIP_ALLOWANCES = {
+    "free_hit": 0,  # Typically 1 per season, often used for specific GWs, set to 0 if not considering
+    "wildcard": 0,  # Typically 2 per season, strategic, set to 0 if not considering
+    "bench_boost": 1,  # Typically 1 per season
+    "triple_captain": 0,  # Typically 1 per season
+}

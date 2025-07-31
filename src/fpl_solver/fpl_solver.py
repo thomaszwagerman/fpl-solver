@@ -7,7 +7,12 @@ import os
 from fpl_xp_predictor import FPLPredictor
 
 # Import configurations from the new config file
-from fpl_config import OPTIMIZATION_GAMEWEEKS, BUDGET, MAX_PLAYERS_PER_TEAM
+from fpl_config import (
+    OPTIMIZATION_GAMEWEEKS,
+    BUDGET,
+    MAX_PLAYERS_PER_TEAM,
+    CHIP_ALLOWANCES,
+)
 
 
 class FPLOptimizer:
@@ -44,7 +49,9 @@ class FPLOptimizer:
         self.total_cost = 0
         self.total_expected_points = 0
 
-    def solve(self, budget: float, max_players_per_team: int) -> bool:
+    def solve(
+        self, budget: float, max_players_per_team: int, chip_allowances: dict
+    ) -> bool:
         """
         Solves the FPL optimization problem.
 
@@ -52,27 +59,125 @@ class FPLOptimizer:
             budget (float): The maximum budget in millions of pounds.
             max_players_per_team (int): The maximum number of players allowed from
                                         any single Premier League team.
+            chip_allowances (dict): A dictionary specifying the maximum usage for each chip.
 
         Returns:
             bool: True if a solution was found, False otherwise.
         """
         self.problem = LpProblem("FPL Squad Optimization", LpMaximize)
 
+        # Decision variables for player selection
         player_vars = LpVariable.dicts("Player", self.player_data.index, 0, 1, LpBinary)
+        starting_xi_vars = LpVariable.dicts(
+            "StartingXI", self.player_data.index, 0, 1, LpBinary
+        )
+        captain_var = LpVariable.dicts(
+            "Captain", self.player_data.index, 0, 1, LpBinary
+        )
+
+        # New: Binary variables for chip usage
+        use_bench_boost = LpVariable("Use_Bench_Boost", 0, 1, LpBinary)
+        use_triple_captain = LpVariable("Use_Triple_Captain", 0, 1, LpBinary)
+
+        # --- Auxiliary variables for linearizing chip effects ---
+
+        # 1. Variables to indicate if a player is on the bench (squad but not starting XI)
+        is_bench_player = LpVariable.dicts(
+            "Is_Bench_Player", self.player_data.index, 0, 1, LpBinary
+        )
+        for i in self.player_data.index:
+            # is_bench_player[i] = 1 if player_vars[i] = 1 and starting_xi_vars[i] = 0
+            self.problem += is_bench_player[i] <= player_vars[i], f"IsBench_Squad_{i}"
+            self.problem += (
+                is_bench_player[i] <= 1 - starting_xi_vars[i],
+                f"IsBench_NotStarter_{i}",
+            )
+            self.problem += (
+                is_bench_player[i] >= player_vars[i] + (1 - starting_xi_vars[i]) - 1,
+                f"IsBench_Logical_{i}",
+            )
+
+        # 2. Variables for actual points gained from Bench Boost
+        # actual_bench_boost_points[i] = expected_points[i] if is_bench_player[i] = 1 AND use_bench_boost = 1
+        actual_bench_boost_points = LpVariable.dicts(
+            "Actual_Bench_Boost_Points", self.player_data.index, 0, None, LpContinuous
+        )
+        for i in self.player_data.index:
+            player_xp = self.player_data.loc[i, "expected_points"]
+            self.problem += (
+                actual_bench_boost_points[i] <= player_xp * is_bench_player[i],
+                f"BenchBoost_Contr_1_{i}",
+            )
+            self.problem += (
+                actual_bench_boost_points[i] <= player_xp * use_bench_boost,
+                f"BenchBoost_Contr_2_{i}",
+            )
+            self.problem += (
+                actual_bench_boost_points[i]
+                >= player_xp * (is_bench_player[i] + use_bench_boost - 1),
+                f"BenchBoost_Contr_3_{i}",
+            )
+            self.problem += (
+                actual_bench_boost_points[i] >= 0,
+                f"BenchBoost_Contr_4_{i}",
+            )  # Explicit non-negativity
+
+        # 3. Variables for actual bonus points gained from Triple Captain
+        # actual_triple_captain_bonus[i] = 2 * expected_points[i] if captain_var[i] = 1 AND use_triple_captain = 1
+        actual_triple_captain_bonus = LpVariable.dicts(
+            "Actual_Triple_Captain_Bonus", self.player_data.index, 0, None, LpContinuous
+        )
+        for i in self.player_data.index:
+            player_xp = self.player_data.loc[i, "expected_points"]
+            self.problem += (
+                actual_triple_captain_bonus[i] <= player_xp * 2 * captain_var[i],
+                f"TripleCaptain_Contr_1_{i}",
+            )
+            self.problem += (
+                actual_triple_captain_bonus[i] <= player_xp * 2 * use_triple_captain,
+                f"TripleCaptain_Contr_2_{i}",
+            )
+            self.problem += (
+                actual_triple_captain_bonus[i]
+                >= player_xp * 2 * (captain_var[i] + use_triple_captain - 1),
+                f"TripleCaptain_Contr_3_{i}",
+            )
+            self.problem += (
+                actual_triple_captain_bonus[i] >= 0,
+                f"TripleCaptain_Contr_4_{i}",
+            )  # Explicit non-negativity
+
+        # --- Objective Function ---
+        # Maximize base expected points from the selected starting 11
+        base_points_expression = lpSum(
+            self.player_data.loc[i, "expected_points"] * starting_xi_vars[i]
+            for i in self.player_data.index
+        )
+
+        # Add points from bench boost and triple captain bonus
+        total_bench_boost_points = lpSum(
+            actual_bench_boost_points[i] for i in self.player_data.index
+        )
+        total_triple_captain_bonus_points = lpSum(
+            actual_triple_captain_bonus[i] for i in self.player_data.index
+        )
 
         self.problem += (
-            lpSum(
-                self.player_data.loc[i, "expected_points"] * player_vars[i]
-                for i in self.player_data.index
-            ),
+            base_points_expression
+            + total_bench_boost_points
+            + total_triple_captain_bonus_points,
             "Total Expected Points",
         )
 
+        # --- Constraints ---
+
+        # 1. Select exactly 15 players for the squad
         self.problem += (
             lpSum(player_vars[i] for i in self.player_data.index) == 15,
             "Total Players",
         )
 
+        # 2. Squad position constraints (2 GKs, 5 DEFs, 5 MIDs, 3 FWDs)
         gks = self.player_data[self.player_data["position"] == "GK"].index
         defs = self.player_data[self.player_data["position"] == "DEF"].index
         mids = self.player_data[self.player_data["position"] == "MID"].index
@@ -83,6 +188,7 @@ class FPLOptimizer:
         self.problem += lpSum(player_vars[i] for i in mids) == 5, "Midfielders Count"
         self.problem += lpSum(player_vars[i] for i in fwds) == 3, "Forwards Count"
 
+        # 3. Budget constraint
         self.problem += (
             lpSum(
                 self.player_data.loc[i, "cost"] * player_vars[i]
@@ -92,6 +198,7 @@ class FPLOptimizer:
             "Total Budget",
         )
 
+        # 4. Maximum players per team constraint
         for team in self.player_data["team"].unique():
             team_players = self.player_data[self.player_data["team"] == team].index
             self.problem += (
@@ -99,25 +206,113 @@ class FPLOptimizer:
                 f"Max Players from {team}",
             )
 
+        # 5. Starting XI constraints
+        # 5.1 Select exactly 11 players for the starting XI
+        self.problem += (
+            lpSum(starting_xi_vars[i] for i in self.player_data.index) == 11,
+            "Total Starting XI Players",
+        )
+
+        # 5.2 A player can only be in the starting XI if they are in the squad
+        for i in self.player_data.index:
+            self.problem += (
+                starting_xi_vars[i] <= player_vars[i],
+                f"StartingXI_in_Squad_{i}",
+            )
+
+        # 5.3 Starting XI position constraints (FPL allows flexible formations, so use minimums)
+        self.problem += (
+            lpSum(starting_xi_vars[i] for i in gks) == 1,
+            "Starting_Goalkeepers_Count",
+        )
+        self.problem += (
+            lpSum(starting_xi_vars[i] for i in defs) >= 3,
+            "Min_Starting_Defenders_Count",
+        )
+        self.problem += (
+            lpSum(starting_xi_vars[i] for i in mids) >= 2,
+            "Min_Starting_Midfielders_Count",
+        )
+        self.problem += (
+            lpSum(starting_xi_vars[i] for i in fwds) >= 1,
+            "Min_Starting_Forwards_Count",
+        )
+
+        # 6. Captain Constraints
+        # 6.1 Select exactly one captain from the starting XI
+        self.problem += (
+            lpSum(captain_var[i] for i in self.player_data.index) == 1,
+            "One_Captain",
+        )
+
+        # 6.2 A player can only be captain if they are in the starting XI
+        for i in self.player_data.index:
+            self.problem += (
+                captain_var[i] <= starting_xi_vars[i],
+                f"Captain_in_StartingXI_{i}",
+            )
+
+        # 7. Chip Usage Constraints
+        self.problem += (
+            use_bench_boost <= chip_allowances.get("bench_boost", 0),
+            "Max_Bench_Boost_Usage",
+        )
+        self.problem += (
+            use_triple_captain <= chip_allowances.get("triple_captain", 0),
+            "Max_Triple_Captain_Usage",
+        )
+
         try:
-            self.problem.solve()
+            # The solver is called with the GLPK_CMD solver
+            self.problem.solve(PULP_CBC_CMD(msg=0))  # msg=0 suppresses verbose output
         except Exception as e:
             print(f"Error solving the problem: {e}")
             return False
 
         if LpStatus[self.problem.status] == "Optimal":
             print("Optimization successful! Optimal solution found.")
+
+            # Create temporary series for starter and captain status based on original player_data index
+            is_starter_series = pd.Series(
+                [starting_xi_vars[i].varValue == 1 for i in self.player_data.index],
+                index=self.player_data.index,
+            )
+            is_captain_series = pd.Series(
+                [captain_var[i].varValue == 1 for i in self.player_data.index],
+                index=self.player_data.index,
+            )
+
+            # Filter self.player_data to get the 15 selected players
             self.selected_squad = self.player_data[
                 [player_vars[i].varValue == 1 for i in self.player_data.index]
             ].copy()
+
+            # Now, assign the 'is_starter' and 'is_captain' columns to the selected_squad
+            # using the index of selected_squad to correctly map the values.
+            self.selected_squad["is_starter"] = is_starter_series.loc[
+                self.selected_squad.index
+            ]
+            self.selected_squad["is_captain"] = is_captain_series.loc[
+                self.selected_squad.index
+            ]
+
             self.total_cost = self.selected_squad["cost"].sum()
-            self.total_expected_points = self.selected_squad["expected_points"].sum()
+
+            # The total expected points is directly the objective value from the solver
+            self.total_expected_points = value(self.problem.objective)
+
+            self.used_chips = {
+                "bench_boost": bool(use_bench_boost.varValue),
+                "triple_captain": bool(use_triple_captain.varValue),
+            }
+
             return True
         else:
             print(f"No optimal solution found. Status: {LpStatus[self.problem.status]}")
             self.selected_squad = None
             self.total_cost = 0
             self.total_expected_points = 0
+            self.used_chips = {}
             return False
 
     def get_selected_squad(self) -> pd.DataFrame | None:
@@ -139,31 +334,52 @@ class FPLOptimizer:
 
         print("\n--- FPL Optimized Squad ---")
         print(f"Total Cost: £{self.total_cost:.1f}m")
-        print(f"Total Expected Points: {self.total_expected_points:.2f}")
-        print("\n--- Goalkeepers ---")
-        print(
-            self.selected_squad[self.selected_squad["position"] == "GK"][
-                ["name", "team", "cost", "expected_points"]
-            ]
-        )
-        print("\n--- Defenders ---")
-        print(
-            self.selected_squad[self.selected_squad["position"] == "DEF"][
-                ["name", "team", "cost", "expected_points"]
-            ]
-        )
-        print("\n--- Midfielders ---")
-        print(
-            self.selected_squad[self.selected_squad["position"] == "MID"][
-                ["name", "team", "cost", "expected_points"]
-            ]
-        )
-        print("\n--- Forwards ---")
-        print(
-            self.selected_squad[self.selected_squad["position"] == "FWD"][
-                ["name", "team", "cost", "expected_points"]
-            ]
-        )
+        print(f"Total Expected Points (with chips): {self.total_expected_points:.2f}")
+        print("\n--- Chips Used ---")
+        if any(self.used_chips.values()):
+            for chip, used in self.used_chips.items():
+                if used:
+                    print(f"- {chip.replace('_', ' ').title()}")
+        else:
+            print("No chips used.")
+
+        print("\n--- Goalkeepers (Starting XI marked with *) ---")
+        for index, row in self.selected_squad[
+            self.selected_squad["position"] == "GK"
+        ].iterrows():
+            starter_str = "*" if row["is_starter"] else ""
+            captain_str = "(C)" if row["is_captain"] else ""
+            print(
+                f"{starter_str} {row['name']} {captain_str} ({row['team']}): £{row['cost']:.1f}m, {row['expected_points']} xP"
+            )
+        print("\n--- Defenders (Starting XI marked with *) ---")
+        for index, row in self.selected_squad[
+            self.selected_squad["position"] == "DEF"
+        ].iterrows():
+            starter_str = "*" if row["is_starter"] else ""
+            captain_str = "(C)" if row["is_captain"] else ""
+            print(
+                f"{starter_str} {row['name']} {captain_str} ({row['team']}): £{row['cost']:.1f}m, {row['expected_points']} xP"
+            )
+        print("\n--- Midfielders (Starting XI marked with *) ---")
+        for index, row in self.selected_squad[
+            self.selected_squad["position"] == "MID"
+        ].iterrows():
+            starter_str = "*" if row["is_starter"] else ""
+            captain_str = "(C)" if row["is_captain"] else ""
+            print(
+                f"{starter_str} {row['name']} {captain_str} ({row['team']}): £{row['cost']:.1f}m, {row['expected_points']} xP"
+            )
+        print("\n--- Forwards (Starting XI marked with *) ---")
+        for index, row in self.selected_squad[
+            self.selected_squad["position"] == "FWD"
+        ].iterrows():
+            starter_str = "*" if row["is_starter"] else ""
+            captain_str = "(C)" if row["is_captain"] else ""
+            print(
+                f"{starter_str} {row['name']} {captain_str} ({row['team']}): £{row['cost']:.1f}m, {row['expected_points']} xP"
+            )
+
         print("\n--- Team Breakdown ---")
         print(self.selected_squad["team"].value_counts())
         print("---------------------------\n")
@@ -186,7 +402,6 @@ if __name__ == "__main__":
     player_data_for_solver = pd.DataFrame(all_players_for_solver)
 
     # Filter out players with 0 expected points or very low cost (e.g., non-playing, injured)
-    # The predictor already sets xP to 0 for unavailable players, but an explicit filter is good.
     player_data_for_solver = player_data_for_solver[
         player_data_for_solver["expected_points"] > 0
     ]
@@ -205,13 +420,17 @@ if __name__ == "__main__":
     # Initialize the optimizer with the fetched and processed player data
     optimizer = FPLOptimizer(player_data_for_solver)
 
-    # Solve the problem using BUDGET and MAX_PLAYERS_PER_TEAM from fpl_config.py
-    if optimizer.solve(budget=BUDGET, max_players_per_team=MAX_PLAYERS_PER_TEAM):
+    # Solve the problem using BUDGET, MAX_PLAYERS_PER_TEAM, and CHIP_ALLOWANCES from fpl_config.py
+    if optimizer.solve(
+        budget=BUDGET,
+        max_players_per_team=MAX_PLAYERS_PER_TEAM,
+        chip_allowances=CHIP_ALLOWANCES,
+    ):
         optimizer.print_squad_summary()
     else:
         print("Could not find an optimal FPL squad with the given parameters.")
         print(
-            "Consider adjusting the 'BUDGET' or 'MAX_PLAYERS_PER_TEAM' in fpl_config.py."
+            "Consider adjusting the 'BUDGET', 'MAX_PLAYERS_PER_TEAM', or 'CHIP_ALLOWANCES' in fpl_config.py."
         )
         print(
             "Also, review the player data to ensure enough eligible players are available in each category."
