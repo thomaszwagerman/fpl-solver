@@ -55,7 +55,7 @@ MAX_PLAYERS_PER_TEAM = (
     3  # Maximum number of players allowed from any single Premier League team
 )
 
-# --- Chip Configuration (New) ---
+# --- Chip Configuration ---
 # Maximum number of times each chip can be used within the OPTIMIZATION_GAMEWEEKS horizon
 CHIP_ALLOWANCES = {
     "free_hit": 0,
@@ -63,3 +63,10 @@ CHIP_ALLOWANCES = {
     "bench_boost": 0,
     "triple_captain": 0,
 }
+
+# --- Transfer Rules (New) ---
+INITIAL_FREE_TRANSFERS = 1
+MAX_FREE_TRANSFERS_SAVED = (
+    5
+)
+POINTS_PER_HIT = 4  # Points deduction per extra transfer

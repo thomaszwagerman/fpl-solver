@@ -13,6 +13,9 @@ from fpl_config import (
     BUDGET,
     MAX_PLAYERS_PER_TEAM,
     CHIP_ALLOWANCES,
+    INITIAL_FREE_TRANSFERS,  # New
+    MAX_FREE_TRANSFERS_SAVED,  # New
+    POINTS_PER_HIT,  # New
 )
 
 
@@ -49,6 +52,7 @@ class FPLOptimizer:
         self.selected_squad_history = {}  # To store squad for each gameweek
         self.total_cost = 0
         self.total_expected_points = 0
+        self.total_transfer_hits = 0  # New attribute to store total hits
 
     def solve(
         self,
@@ -83,7 +87,7 @@ class FPLOptimizer:
             "Captain", (self.player_data.index, range(num_gameweeks)), 0, 1, LpBinary
         )
 
-        # New: Binary variables for chip usage, indexed by gameweek
+        # Binary variables for chip usage, indexed by gameweek
         use_bench_boost = LpVariable.dicts(
             "Use_Bench_Boost", range(num_gameweeks), 0, 1, LpBinary
         )
@@ -91,9 +95,7 @@ class FPLOptimizer:
             "Use_Triple_Captain", range(num_gameweeks), 0, 1, LpBinary
         )
 
-        # New: Transfer variables
-        # Note: Transfers occur *between* gameweeks. For num_gameweeks, there are num_gameweeks-1 transfer windows.
-        # transfer_in_vars[i][w] means player i is transferred IN for gameweek w (i.e., at the start of GW w)
+        # Transfer variables
         transfer_in_vars = LpVariable.dicts(
             "Transfer_In",
             (self.player_data.index, range(1, num_gameweeks)),
@@ -109,7 +111,25 @@ class FPLOptimizer:
             LpBinary,
         )
 
-        # --- Auxiliary variables for linearizing chip effects ---
+        # NEW: Transfer rule variables
+        # Total transfers made in a gameweek (absolute count)
+        transfers_made = LpVariable.dicts(
+            "Transfers_Made", range(1, num_gameweeks), 0, None, LpInteger
+        )
+        # Free transfers available at the start of a gameweek
+        free_transfers_available = LpVariable.dicts(
+            "Free_Transfers_Available",
+            range(num_gameweeks),
+            0,
+            MAX_FREE_TRANSFERS_SAVED + 1,
+            LpInteger,  # Max 2 free transfers
+        )
+        # Number of transfer hits taken in a gameweek
+        transfer_hits = LpVariable.dicts(
+            "Transfer_Hits", range(1, num_gameweeks), 0, None, LpInteger
+        )
+
+        # Auxiliary variables for linearizing chip effects
         is_bench_player = LpVariable.dicts(
             "Is_Bench_Player",
             (self.player_data.index, range(num_gameweeks)),
@@ -136,7 +156,6 @@ class FPLOptimizer:
         total_objective_points = []
 
         # Get the first gameweek number from the player data to correctly index expected_points_by_gw
-        # Assuming all players have data for the same set of gameweeks and the first GW is consistent.
         first_gw_key = next(
             iter(
                 self.player_data.loc[
@@ -151,7 +170,6 @@ class FPLOptimizer:
             gw_actual = current_gameweek_number_start + w
 
             # Base expected points from the selected starting 11 for this gameweek
-            # Now using expected_points_by_gw for dynamic xP per gameweek
             base_points_expression_gw = lpSum(
                 self.player_data.loc[i, "expected_points_by_gw"][gw_actual]
                 * starting_xi_vars[i][w]
@@ -229,6 +247,11 @@ class FPLOptimizer:
 
             total_objective_points.append(total_bench_boost_points_gw)
             total_objective_points.append(total_triple_captain_bonus_points_gw)
+
+        # Subtract transfer hits from the total objective
+        total_objective_points.append(
+            -POINTS_PER_HIT * lpSum(transfer_hits[w] for w in range(1, num_gameweeks))
+        )
 
         self.problem += (
             lpSum(total_objective_points),
@@ -333,7 +356,6 @@ class FPLOptimizer:
                     captain_var[i][w] <= starting_xi_vars[i][w],
                     f"Captain_in_StartingXI_{i}_{w}",
                 )
-
         # --- Chip Usage Constraints (TOTAL usage over all gameweeks) ---
         # These constraints should be outside the per-gameweek loop to avoid duplicates.
         self.problem += (
@@ -347,9 +369,60 @@ class FPLOptimizer:
             f"Max_Triple_Captain_Usage_Total",
         )
 
-        # --- Inter-Gameweek Constraints (Transfers) ---
-        # Transfers occur from the end of GW w-1 to the start of GW w
+        # --- Inter-Gameweek Constraints (Transfers and Transfer Rules) ---
+        # Initialize free transfers for GW0 (first gameweek of optimization horizon)
+        # This assumes the optimization starts at GW0, and it has INITIAL_FREE_TRANSFERS.
+        # If the model starts at an arbitrary GW, this would need to be an input.
+        self.problem += (
+            free_transfers_available[0] == INITIAL_FREE_TRANSFERS,
+            f"Initial_Free_Transfers_GW0",
+        )
+
         for w in range(1, num_gameweeks):
+            # Calculate total transfers made in this gameweek
+            self.problem += (
+                transfers_made[w]
+                == lpSum(transfer_in_vars[i][w] for i in self.player_data.index),
+                f"Transfers_Made_GW{w}",
+            )
+            # Total transfers in must equal total transfers out for each gameweek after the first
+            self.problem += (
+                lpSum(transfer_in_vars[i][w] for i in self.player_data.index)
+                == lpSum(transfer_out_vars[i][w] for i in self.player_data.index),
+                f"Transfers_In_Equals_Out_GW{w}",
+            )
+
+            # Calculate free transfers available for the current gameweek (w)
+            # Free transfers for GW_w = min(free transfers from GW_w-1 - transfers made in GW_w + 1, MAX_FREE_TRANSFERS_SAVED + 1)
+            # The + 1 in MAX_FREE_TRANSFERS_SAVED + 1 is because MAX_FREE_TRANSFERS_SAVED implies how many can be *saved*,
+            # so if you save 1, you have 1 (current) + 1 (saved) = 2.
+            self.problem += (
+                free_transfers_available[w]
+                <= free_transfers_available[w - 1] - transfers_made[w] + 1,
+                f"Free_Transfers_Calc_1_GW{w}",
+            )
+            self.problem += (
+                free_transfers_available[w] <= MAX_FREE_TRANSFERS_SAVED + 1,
+                f"Free_Transfers_Calc_2_GW{w}",
+            )
+            self.problem += (
+                free_transfers_available[w] >= 0,  # Cannot have negative free transfers
+                f"Free_Transfers_Non_Negative_GW{w}",
+            )
+
+            # Calculate transfer hits
+            # transfer_hits[w] = max(0, transfers_made[w] - free_transfers_available_at_start_of_gw_w)
+            # This needs to be linearized. If transfers_made[w] > free_transfers_available[w-1], then hit.
+            # free_transfers_available[w-1] represents transfers available *before* making transfers for GW_w
+            self.problem += (
+                transfer_hits[w] >= transfers_made[w] - free_transfers_available[w - 1],
+                f"Transfer_Hits_Calc_1_GW{w}",
+            )
+            self.problem += (
+                transfer_hits[w] >= 0,
+                f"Transfer_Hits_Calc_2_GW{w}",
+            )
+
             for i in self.player_data.index:
                 # Squad continuity: player_vars[i][w] (in squad at start of GW w)
                 #                 = player_vars[i][w-1] (in squad at start of GW w-1)
@@ -368,14 +441,6 @@ class FPLOptimizer:
                     f"No_Simultaneous_Transfer_{i}_{w}",
                 )
 
-            # Total transfers in must equal total transfers out for each gameweek after the first
-            self.problem += (
-                lpSum(transfer_in_vars[i][w] for i in self.player_data.index)
-                == lpSum(transfer_out_vars[i][w] for i in self.player_data.index),
-                f"Transfers_In_Equals_Out_GW{w}",
-            )
-            # You would add constraints here for free transfers, hits (e.g., -4 for >1 transfer), etc.
-
         try:
             # The solver is called with the GLPK_CMD solver
             self.problem.solve(PULP_CBC_CMD(msg=0))  # msg=0 suppresses verbose output
@@ -387,6 +452,7 @@ class FPLOptimizer:
             print("Optimization successful! Optimal solution found.")
 
             self.selected_squad_history = {}
+            self.total_transfer_hits = 0  # Reset for this run
             for w in range(num_gameweeks):
                 # The actual gameweek number (1-indexed)
                 gw_actual = current_gameweek_number_start + w
@@ -416,26 +482,40 @@ class FPLOptimizer:
                     selected_squad_gw.index
                 ]
 
+                transfers_in_gw = 0
+                transfers_out_gw = 0
+                hits_gw = 0
+
                 # Store transfer details for gameweeks > 0
-                # A player is "transferred_in" for GW_actual if transfer_in_vars[i][w] is 1
-                # A player is "transferred_out" for GW_actual if transfer_out_vars[i][w] is 1
                 if (
                     w > 0
                 ):  # Check for transfers only from GW1 onwards (index 1 in 0-indexed loop)
-                    selected_squad_gw["transfer_in"] = pd.Series(
+                    transfer_in_flags = pd.Series(
                         [
                             transfer_in_vars[i][w].varValue == 1
                             for i in self.player_data.index
                         ],
                         index=self.player_data.index,
-                    ).loc[selected_squad_gw.index]
-                    selected_squad_gw["transfer_out"] = pd.Series(
+                    )
+                    transfer_out_flags = pd.Series(
                         [
                             transfer_out_vars[i][w].varValue == 1
                             for i in self.player_data.index
                         ],
                         index=self.player_data.index,
-                    ).loc[selected_squad_gw.index]
+                    )
+
+                    selected_squad_gw["transfer_in"] = transfer_in_flags.loc[
+                        selected_squad_gw.index
+                    ]
+                    selected_squad_gw["transfer_out"] = transfer_out_flags.loc[
+                        selected_squad_gw.index
+                    ]
+
+                    transfers_in_gw = int(round(transfer_in_flags.sum()))
+                    transfers_out_gw = int(round(transfer_out_flags.sum()))
+                    hits_gw = int(round(transfer_hits[w].varValue))
+                    self.total_transfer_hits += hits_gw
                 else:
                     selected_squad_gw["transfer_in"] = False  # No transfers in for GW0
                     selected_squad_gw["transfer_out"] = (
@@ -464,6 +544,14 @@ class FPLOptimizer:
                             for i in self.player_data.index
                         )
                     ),
+                    "transfers_in_count": transfers_in_gw,  # New
+                    "transfers_out_count": transfers_out_gw,  # New
+                    "transfer_hits": hits_gw,  # New
+                    "free_transfers_available_next_gw": (
+                        int(round(free_transfers_available[w].varValue))
+                        if w < num_gameweeks - 1
+                        else 0
+                    ),  # New: free transfers available *after* this GW's transfers are made
                 }
 
             # Overall totals
@@ -490,6 +578,7 @@ class FPLOptimizer:
             self.total_cost = 0
             self.total_expected_points = 0
             self.used_chips = {}
+            self.total_transfer_hits = 0
             return False
 
     def get_selected_squad(self, gameweek: int = None) -> pd.DataFrame | None:
@@ -590,6 +679,12 @@ class FPLOptimizer:
         triple_captain_used = gw_data["triple_captain_used"]
         total_bench_boost_points = gw_data["total_bench_boost_points"]
         total_triple_captain_bonus = gw_data["total_triple_captain_bonus"]
+        transfers_in_count = gw_data["transfers_in_count"]  # New
+        transfers_out_count = gw_data["transfers_out_count"]  # New
+        transfer_hits_taken = gw_data["transfer_hits"]  # New
+        free_transfers_available_next_gw = gw_data[
+            "free_transfers_available_next_gw"
+        ]  # New
 
         print(f"\n--- FPL Optimized Squad for Gameweek {gameweek} ---")
         print(f"Squad Cost: £{total_cost:.1f}m")
@@ -615,9 +710,7 @@ class FPLOptimizer:
             if row["transfer_in"]:
                 transfer_status = "(IN)"
             elif row["transfer_out"]:
-                transfer_status = (
-                    "(OUT)"  # This player would not be in the squad if transferred out
-                )
+                transfer_status = "(OUT)"
 
             # Access gameweek-specific xP correctly
             player_gw_xp = row["expected_points_by_gw"].get(gameweek, 0.0)
@@ -682,21 +775,23 @@ class FPLOptimizer:
         first_gw_in_history = min(
             int(k.replace("GW", "")) for k in self.selected_squad_history.keys()
         )
-        if gameweek > first_gw_in_history:
-            # `transfer_in` and `transfer_out` columns are boolean. Summing them gives the count.
-            transfers_in_count = (
-                selected_squad["transfer_in"].sum()
-                if "transfer_in" in selected_squad.columns
-                else 0
-            )
-            transfers_out_count = (
-                selected_squad["transfer_out"].sum()
-                if "transfer_out" in selected_squad.columns
-                else 0
+        if (
+            gameweek >= first_gw_in_history
+        ):  # Changed from > to >=, to show initial free transfers
+            # Display transfer info for this gameweek
+            print(
+                f"  Transfers In: {transfers_in_count}, Transfers Out: {transfers_out_count}"
             )
             print(
-                f"  Transfers In: {int(transfers_in_count)}, Transfers Out: {int(transfers_out_count)}"
+                f"  Transfer Hits: {transfer_hits_taken} (-{transfer_hits_taken * POINTS_PER_HIT} points)"
             )
+            # Only show free transfers for the *next* gameweek if it's not the last gameweek in the horizon
+            if gameweek < max(
+                int(k.replace("GW", "")) for k in self.selected_squad_history.keys()
+            ):
+                print(
+                    f"  Free Transfers Available for Next GW: {free_transfers_available_next_gw}"
+                )
         print("---------------------------\n")
 
     def print_overall_summary(self):
@@ -719,6 +814,9 @@ class FPLOptimizer:
         print(
             f"Squad Cost ({last_gw_key}): £{self.selected_squad_history[last_gw_key]['total_cost']:.1f}m"
         )
+        print(
+            f"Total Transfer Hits Taken: {self.total_transfer_hits} (-{self.total_transfer_hits * POINTS_PER_HIT} points)"
+        )  # New
 
         print("\n--- Chip Usage Across Gameweeks ---")
         # Ensure consistent order by sorting gameweek keys
@@ -751,22 +849,26 @@ class FPLOptimizer:
                 f"  Total GW Points (incl. chips): {gw_data['expected_points_from_xi'] + gw_data['total_bench_boost_points'] + gw_data['total_triple_captain_bonus']:.2f}"
             )
 
-            # Check for transfers in this gameweek (not for the very first gameweek of optimization)
-            if int(gw_str.replace("GW", "")) > min(
+            # Display transfer info for this gameweek
+            transfers_in_count = gw_data["transfers_in_count"]
+            transfers_out_count = gw_data["transfers_out_count"]
+            transfer_hits_taken = gw_data["transfer_hits"]
+            free_transfers_available_next_gw = gw_data[
+                "free_transfers_available_next_gw"
+            ]
+
+            print(
+                f"  Transfers In: {transfers_in_count}, Transfers Out: {transfers_out_count}"
+            )
+            print(
+                f"  Transfer Hits: {transfer_hits_taken} (-{transfer_hits_taken * POINTS_PER_HIT} points)"
+            )
+            # Only show free transfers for the *next* gameweek if it's not the last gameweek in the horizon
+            if int(gw_str.replace("GW", "")) < max(
                 int(k.replace("GW", "")) for k in self.selected_squad_history.keys()
             ):
-                transfers_in_count = (
-                    gw_data["squad"]["transfer_in"].sum()
-                    if "transfer_in" in gw_data["squad"].columns
-                    else 0
-                )
-                transfers_out_count = (
-                    gw_data["squad"]["transfer_out"].sum()
-                    if "transfer_out" in gw_data["squad"].columns
-                    else 0
-                )
                 print(
-                    f"  Transfers In: {int(transfers_in_count)}, Transfers Out: {int(transfers_out_count)}"
+                    f"  Free Transfers Available for Next GW: {free_transfers_available_next_gw}"
                 )
             print("-----------------------------------")
 
