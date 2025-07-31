@@ -12,6 +12,8 @@ from fpl_config import (
     RED_CARD_PROB,
     PENALTY_MISS_PROB,
     OWN_GOAL_PROB,
+    CBIT_DEF_PROB,  # New import
+    CBIRT_MID_FWD_PROB,  # New import
     DEFAULT_SUB_MINUTES,
     DEFAULT_UNKNOWN_PLAYER_MINUTES,
     EXCLUDED_PLAYERS_BY_ID,
@@ -114,21 +116,30 @@ class FPLPredictor:
             for player_id, player_info in self.players_data.items():
                 # Exclude by ID
                 if player_id in EXCLUDED_PLAYERS_BY_ID:
-                    print(f"Excluding player by ID: {player_info['name']} (ID: {player_id})")
+                    print(
+                        f"Excluding player by ID: {player_info['name']} (ID: {player_id})"
+                    )
                     continue
 
                 # Exclude by Name
-                if player_info['name'] in EXCLUDED_PLAYERS_BY_NAME:
-                    print(f"Excluding player by Name: {player_info['name']} (ID: {player_id})")
+                if player_info["name"] in EXCLUDED_PLAYERS_BY_NAME:
+                    print(
+                        f"Excluding player by Name: {player_info['name']} (ID: {player_id})"
+                    )
                     continue
 
                 # Exclude by Team and Position
                 excluded_by_team_pos = False
                 for exclusion_rule in EXCLUDED_PLAYERS_BY_TEAM_AND_POSITION:
-                    team_name = self.teams_data.get(player_info['team_id'], {}).get('name')
-                    if (team_name == exclusion_rule.get("team") and
-                        player_info['position'] == exclusion_rule.get("position")):
-                        print(f"Excluding player by Team/Position: {player_info['name']} ({team_name}, {player_info['position']})")
+                    team_name = self.teams_data.get(player_info["team_id"], {}).get(
+                        "name"
+                    )
+                    if team_name == exclusion_rule.get("team") and player_info[
+                        "position"
+                    ] == exclusion_rule.get("position"):
+                        print(
+                            f"Excluding player by Team/Position: {player_info['name']} ({team_name}, {player_info['position']})"
+                        )
                         excluded_by_team_pos = True
                         break
                 if excluded_by_team_pos:
@@ -137,8 +148,9 @@ class FPLPredictor:
                 players_to_keep[player_id] = player_info
 
             self.players_data = players_to_keep
-            print(f"Filtered {initial_player_count - len(self.players_data)} players. Remaining: {len(self.players_data)}")
-
+            print(
+                f"Filtered {initial_player_count - len(self.players_data)} players. Remaining: {len(self.players_data)}"
+            )
 
             # Process teams data
             for team in static_data["teams"]:
@@ -338,8 +350,11 @@ class FPLPredictor:
             # Fallback if strength data is missing (shouldn't happen with robust data fetch)
             return {"xp": 0.0, "reason": "Team strength data missing for fixture."}
 
-        # 1. Appearance points (scaled by expected minutes)
-        xp += (expected_minutes / 90.0) * self.fpl_points["appearance_points"]
+        # 1. Appearance points
+        if expected_minutes >= 60:
+            xp += self.fpl_points["appearance_points_gte_60"]
+        elif expected_minutes > 0:
+            xp += self.fpl_points["appearance_points_lt_60"]
 
         # 2. Expected Goals (scaled by historical goals per 90 and opponent difficulty)
         # Use player's form and total goals as a basis
@@ -379,18 +394,19 @@ class FPLPredictor:
         )  # Similarly scale by team's expected goals
         xp += expected_assists_player_contribution * self.fpl_points["assist_points"]
 
-        # 4. Expected Clean Sheets (for GKs/DEFs) and Conceded Goals deduction
+        # 4. Expected Clean Sheets (for GKs/DEFs/MIDs) and Conceded Goals deduction
         expected_conceded = self._calculate_expected_conceded_goals(
             player_team_strength_defence, opponent_team_strength_attack
         )
 
+        # Probability of clean sheet
+        # Simplified: higher team defense / lower opponent attack -> higher CS prob
+        # Use logistic or sigmoid for probability
+        cs_prob = 1.0 / (
+            1.0 + math.exp(expected_conceded - 1.0)
+        )  # Sigmoid centered at 1 goal
+
         if position in ["GK", "DEF"]:
-            # Probability of clean sheet
-            # Simplified: higher team defense / lower opponent attack -> higher CS prob
-            # Use logistic or sigmoid for probability
-            cs_prob = 1.0 / (
-                1.0 + math.exp(expected_conceded - 1.0)
-            )  # Sigmoid centered at 1 goal
             xp += cs_prob * self.fpl_points["clean_sheet_gk_def"]
 
             # Conceded goals deduction: Apply penalty for every 2 goals conceded *probability*
@@ -398,6 +414,8 @@ class FPLPredictor:
             xp += (expected_conceded / 2.0) * self.fpl_points[
                 "conceded_2_goals_deduction"
             ]
+        elif position == "MID":  # New for midfielders
+            xp += cs_prob * self.fpl_points["clean_sheet_mid"]
 
         # 5. Expected Saves (for GKs)
         if position == "GK":
@@ -412,9 +430,9 @@ class FPLPredictor:
                 * expected_minutes
                 * (opponent_team_strength_attack / player_team_strength_defence)
             )
-            xp += (
-                expected_saves_player_contribution / 3.0
-            ) * 1  # 1 point per 3 saves. Assuming 1 point per 3 saves.
+            xp += (expected_saves_player_contribution / 3.0) * self.fpl_points[
+                "saves_3_points"
+            ]  # Using the new config point value
 
             # Penalty saves (low probability, use historical rate)
             penalty_saves_hist_per_game = (
@@ -441,24 +459,16 @@ class FPLPredictor:
         xp += (expected_minutes / 90.0) * (
             self.fpl_points["yellow_card_deduction"] * YELLOW_CARD_PROB
             + self.fpl_points["red_card_deduction"] * RED_CARD_PROB
-            + self.fpl_points["own_goal_deduction"]
-            * OWN_GOAL_PROB  # Ensure own_goal_deduction is in FPL_POINTS
-            + self.fpl_points["penalty_miss_deduction"]
-            * PENALTY_MISS_PROB  # Ensure penalty_miss_deduction is in FPL_POINTS
+            + self.fpl_points["own_goal_deduction"] * OWN_GOAL_PROB
+            + self.fpl_points["penalty_miss_deduction"] * PENALTY_MISS_PROB
         )
 
         # 8. Defensive Contribution Points (for 2025/26 season heuristic)
         # Assuming CBIT/CBIRT tracking
         if position in ["GK", "DEF"]:
-            xp += (
-                self.fpl_points["defensive_contribution_prob_def"]
-                * self.fpl_points["defensive_contribution_points"]
-            )
+            xp += CBIT_DEF_PROB * self.fpl_points["cbit_def_points"]
         elif position in ["MID", "FWD"]:
-            xp += (
-                self.fpl_points["defensive_contribution_prob_mid_fwd"]
-                * self.fpl_points["defensive_contribution_points"]
-            )
+            xp += CBIRT_MID_FWD_PROB * self.fpl_points["cbirt_mid_fwd_points"]
 
         return {"xp": round(xp, 2), "reason": "Success"}
 

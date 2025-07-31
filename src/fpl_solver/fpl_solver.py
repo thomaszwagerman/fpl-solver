@@ -452,6 +452,7 @@ class FPLOptimizer:
                     print(
                         f"Warning: No players found for enforced requirement: at least one {position} from {team} for GW{gw_actual}."
                     )
+                    
         # --- Chip Usage Constraints (TOTAL usage over all gameweeks) ---
         # These constraints should be outside the per-gameweek loop to avoid duplicates.
         self.problem += (
