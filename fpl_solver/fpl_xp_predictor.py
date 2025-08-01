@@ -48,8 +48,6 @@ from fpl_config import (
     RED_CARD_PROB,
     PENALTY_MISS_PROB,
     OWN_GOAL_PROB,
-    CBIT_DEF_PROB,
-    CBIRT_MID_FWD_PROB,
     DEFAULT_SUB_MINUTES,
     DEFAULT_UNKNOWN_PLAYER_MINUTES,
     EXCLUDED_PLAYERS_BY_ID,
@@ -199,6 +197,7 @@ class FPLPredictor:
                         "value_season": float(element.get("value_season", 0)),
                         "value_form": float(element.get("value_form", 0)),
                         "ict_index": float(element.get("ict_index", 0)),
+                        "defensive_contribution": float(element.get("defensive_contribution", 0)),
                     }
                 except KeyError as e:
                     self.logger.warning(f"Missing required field for player: {str(e)}")
@@ -610,12 +609,19 @@ class FPLPredictor:
             + self.fpl_points["penalty_miss_deduction"] * PENALTY_MISS_PROB
         )
 
-        # 8. Defensive Contribution Points (for 2025/26 season heuristic)
-        # Assuming CBIT/CBIRT tracking
+        # 8. Defensive Contribution Points (for 2025/26 season)
+        # Use actual defensive_contribution data from API
+        defensive_contribution_per_90 = (
+            (player["defensive_contribution"] / player["minutes"] * 90)
+            if player["minutes"] > 0
+            else 0.0
+        )
+        expected_defensive_contribution = (defensive_contribution_per_90 / 90.0) * expected_minutes
+        
         if position in ["GK", "DEF"]:
-            xp += CBIT_DEF_PROB * self.fpl_points["cbit_def_points"]
+            xp += expected_defensive_contribution * self.fpl_points["cbit_def_points"]
         elif position in ["MID", "FWD"]:
-            xp += CBIRT_MID_FWD_PROB * self.fpl_points["cbirt_mid_fwd_points"]
+            xp += expected_defensive_contribution * self.fpl_points["cbirt_mid_fwd_points"]
 
         return {"xp": round(xp, 2), "reason": "Success"}
 

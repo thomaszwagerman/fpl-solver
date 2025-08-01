@@ -27,8 +27,6 @@ FPL_POINTS = {
     "own_goal_deduction": -2,  # For each own goal
     # Defensive Contribution Points for 2025/26 season
     "defensive_contribution_points": 2,  # Points awarded for hitting threshold
-    "defensive_contribution_prob_def": 0.3,  # Heuristic probability for defenders/GKs to hit 10 CBIT
-    "defensive_contribution_prob_mid_fwd": 0.15,  # Heuristic probability for mids/fwds to hit 12 CBIRT
     # Bonus points factor is now more of a scaling for expected BPS score
     "bonus_points_scaling_factor": 0.005,  # A small factor to convert BPS score to expected bonus points (Model specific)
 }
@@ -45,10 +43,6 @@ RED_CARD_PROB = 0.005
 PENALTY_MISS_PROB = 0.01
 OWN_GOAL_PROB = 0.002
 
-# Heuristic probabilities for the new defensive contribution points (if direct event data is not available)
-# These are internal model parameters, not direct FPL rules.
-CBIT_DEF_PROB = 0.3  # Heuristic probability for defenders/GKs to hit 10 CBIT
-CBIRT_MID_FWD_PROB = 0.15  # Heuristic probability for mids/fwds to hit 12 CBIRT
 
 # Default average minutes for players with some minutes but no starts (e.g., regular subs)
 DEFAULT_SUB_MINUTES = 30.0
