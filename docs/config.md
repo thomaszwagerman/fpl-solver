@@ -1,6 +1,6 @@
 # Configuration
 
-The `fpl_config.py` file centralizes all configurable parameters for the FPL Expected Points Predictor and Solver. This allows for easy adjustment of FPL scoring rules, thresholds, and optimization settings without modifying the core logic of the predictor or optimizer.
+The `config.py` file centralizes all configurable parameters for the FPL Expected Points Predictor and Solver. This allows for easy adjustment of FPL scoring rules, thresholds, and optimization settings without modifying the core logic of the predictor or optimizer.
 
 ## FPL Point System (`FPL_POINTS`)
 
@@ -60,27 +60,28 @@ These probabilities are used in the xP calculation for rare negative events.
 
   * **Default:** `0.002`
 
-## Heuristic Probabilities for Defensive Contribution Points
-
-These are internal model parameters used to estimate the likelihood of players achieving the new defensive contribution point thresholds, if direct event data is not available from the FPL API.
-
-* `CBIT_DEF_PROB`: Heuristic probability for defenders/goalkeepers to accumulate 10 or more Clearances, Blocks, Interceptions (CBI) & Tackles.
-
-  * **Default:** `0.3`
-
-* `CBIRT_MID_FWD_PROB`: Heuristic probability for midfielders/forwards to accumulate 12 or more Clearances, Blocks, Interceptions (CBI), Tackles & Recoveries.
-
-  * **Default:** `0.15`
-
 ## Default Expected Minutes
 
 * `DEFAULT_SUB_MINUTES`: Default average minutes assigned to players who typically come on as substitutes.
 
-  * **Default:** `30.0`
+  * **Default:** `15.0`
 
 * `DEFAULT_UNKNOWN_PLAYER_MINUTES`: Default expected minutes for new players or those with very sparse historical data.
 
-  * **Default:** `10.0`
+  * **Default:** `1.0`
+
+## xP Confidence Factors
+
+These factors are applied to scale expected points based on a player's historical minutes, helping to discourage selection of unproven players.
+
+* `very_low_minutes`: Applied to players with less than `VERY_LOW_MINUTES_THRESHOLD` minutes.
+  * **Default:** `0.25` (reduces xP by 75%)
+
+* `low_minutes`: Applied to players with less than `MIN_MINUTES_THRESHOLD` minutes.
+  * **Default:** `0.5` (reduces xP by 50%)
+
+* `proven`: Applied to players with more than `MIN_MINUTES_THRESHOLD` minutes.
+  * **Default:** `1.0` (no reduction)
 
 ## Solver Configuration
 

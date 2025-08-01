@@ -29,7 +29,7 @@ edit_uri: edit/main/docs/
 
 nav:
   - Home: index.md
-  - Configuration: fpl_config.md
+  - Configuration: config.md
 
 plugins:
   - search
@@ -45,7 +45,7 @@ plugins:
   - mkdocs-autoapi:
       autoapi_add_nav_entry: API
       autoapi_ignore:
-        - fpl_solver/fpl_config.py
+        - fpl_solver/config.py
   - autorefs:
       resolve_closest: true
 
