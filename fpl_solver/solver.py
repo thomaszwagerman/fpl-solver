@@ -983,4 +983,3 @@ class FPLOptimizer:
 
 
 # End of FPLOptimizer class
-# End of FPLOptimizer class
