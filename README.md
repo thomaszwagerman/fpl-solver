@@ -14,46 +14,48 @@ because FPL do not provide any sensible data from which this can be deduced.
 
 ## ✨ Features
 
-* **FPL Data Integration:** Fetches up-to-date player, team, and fixture information directly from the official FPL API.
-
-* **Expected Points (xP) Prediction:** Calculates a player's expected points based on historical performance, team strengths, opponent difficulty (Fixture Difficulty Rating - FDR), and expected minutes played.
-
-* **Granular Expected Minutes:** Refined logic to predict player minutes, especially for those with low historical play, ensuring more realistic xP values.
-
-* **Multi-Gameweek Optimization:** Optimize your squad over multiple upcoming gameweeks to plan for future fixtures.
-
-* **Configurable Parameters:** Easily adjust probabilities, low-minute penalties, chip usage, player exclusion, xP thresholds, budget, and team limits via a dedicated configuration file.
+* **FPL Data Integration:** Fetches up-to-date player, team, and fixture information directly from the official FPL API
+* **Expected Points (xP) Prediction:** Calculates a player's expected points based on historical performance, team strengths, opponent difficulty (Fixture Difficulty Rating - FDR), and expected minutes played
+* **Granular Expected Minutes:** Refined logic to predict player minutes, especially for those with low historical play, ensuring more realistic xP values
+* **Multi-Gameweek Optimization:** Optimize your squad over multiple upcoming gameweeks to plan for future fixtures
+* **Configurable Parameters:** Easily adjust probabilities, low-minute penalties, chip usage, player exclusion, xP thresholds, budget, and team limits via a dedicated configuration file
 
 ## 🚀 How It Works
 
 The project is structured into three main components:
 
-1. **`config.py`**:
-   This file contains all the configuration variables needed by the solver and predictor, including:
-   - FPL scoring rules
-   - Player statistics
-   - Squad constraints
+**`config.py`**
 
-2. **`xp_predictor.py`**:
-   This code calculates expected points (xP) for each player over the next few gameweeks. It accounts for:
-   - Minutes played probability (with confidence adjustments based on historical minutes)
-   - Clean sheet probability
-   - Goal-scoring probability
-   - Assist probability
-   - Bonus points probability
-   - Defensive contributions (new for 2025/26 season)
-   - Historical reliability (reduces xP for unproven players)
+Contains all configuration variables needed by the solver and predictor:
 
-3. **`solver.py`**:
-   This is the core optimization engine. It takes the xP-calculated player data from `xp_predictor.py` and:
+   * FPL scoring rules
+   * Player statistics
+   * Squad constraints
 
-   * Sets up an Integer Linear Programming (ILP) problem using the `PuLP` library.
+**`xp_predictor.py`**
 
-   * Defines constraints for squad size (15 players), position counts (2 GKs, 5 DEFs, 5 MIDs, 3 FWDs), total budget, and maximum players per team.
+Calculates expected points (xP) for each player over multiple gameweeks
 
-   * Maximizes the total expected points of the selected squad.
+Accounts for:
 
-   * Prints a detailed summary of the optimal squad, including costs and xP breakdown by position, and a team-by-team player count.
+   * Minutes played probability (with confidence adjustments)
+   * Clean sheet probability
+   * Goal-scoring probability
+   * Assist probability
+   * Bonus points probability
+   * Defensive contributions (new for 2025/26)
+   * Historical reliability (reduces xP for unproven players)
+
+**`solver.py`**
+
+Core optimization engine using xP-calculated player data
+
+Features:
+
+   * Sets up Integer Linear Programming (ILP) using PuLP
+   * Defines squad constraints (size, positions, budget, team limits)
+   * Maximizes total expected points
+   * Prints detailed squad summary and breakdown position, and a team-by-team player count.
 
 ## 🛠️ Setup and Installation
 
@@ -84,46 +86,44 @@ To get the FPL Squad Optimizer running on your local machine, follow these steps
 
 Once you have set up the environment and installed the dependencies, you can run the optimizer from your terminal:
 
-```
+```bash
 python run_solver.py
 ```
 
 The script will:
 
-1. Initialize the FPL Predictor to fetch the latest data.
-
-2. Calculate expected points for all players over the number of gameweeks specified in `config.py`.
-
-3. Run the optimization solver.
-
-4. Print the optimal 15-player squad, its total cost, and total expected points.
+1. Initialize the FPL Predictor to fetch the latest data
+2. Calculate expected points for all players over the number of gameweeks specified in `config.py`
+3. Run the optimization solver
+4. Print the optimal 15-player squad, its total cost, and total expected points
 
 ## ⚙️ Configuration
 
 All key parameters are located in `config.py`. You can modify these values to experiment with different scenarios:
 
-* **`OPTIMIZATION_GAMEWEEKS`**: The number of upcoming gameweeks the solver should consider for xP calculation (e.g., `1` for the next gameweek, `3` for the next three).
+### Core Settings
+* **`OPTIMIZATION_GAMEWEEKS`**: Number of gameweeks to optimize for (e.g., `1` or `3`)
+* **`BUDGET`**: Total FPL budget in millions (default: `100.0`)
+* **`MAX_PLAYERS_PER_TEAM`**: Maximum players from one team (default: `3`)
+* **`FPL_POINTS`**: Dictionary of points for all FPL events
 
-* **`BUDGET`**: Your total FPL budget in millions of pounds (e.g., `100.0`).
+### Minutes Thresholds
+* **`MIN_MINUTES_THRESHOLD`**: Minutes for reliable per-90 stats
+* **`VERY_LOW_MINUTES_THRESHOLD`**: Minutes before heavy regression
+* **`DEFAULT_SUB_MINUTES`**: Expected minutes for rotation players (15.0)
+* **`DEFAULT_UNKNOWN_PLAYER_MINUTES`**: Minutes for unproven players (1.0)
 
-* **`MAX_PLAYERS_PER_TEAM`**: The maximum number of players you want from any single Premier League team (FPL limit is usually `3`).
+### Performance Adjustments
+* **Negative Event Probabilities**:
+  * `YELLOW_CARD_PROB`: Yellow card probability
+  * `RED_CARD_PROB`: Red card probability
+  * `PENALTY_MISS_PROB`: Penalty miss probability
+  * `OWN_GOAL_PROB`: Own goal probability
 
-* **`FPL_POINTS`**: A dictionary defining the points awarded for various FPL events (goals, assists, clean sheets, etc.).
-
-* **`MIN_MINUTES_THRESHOLD`**: Minimum minutes played for a player's per-90 stats to be considered fully reliable.
-
-* **`VERY_LOW_MINUTES_THRESHOLD`**: Minutes threshold below which per-90 stats are heavily regressed.
-
-* `YELLOW_CARD_PROB`, `RED_CARD_PROB`, `PENALTY_MISS_PROB`, **`OWN_GOAL_PROB`**: Heuristic probabilities for negative events.
-
-* **`DEFAULT_SUB_MINUTES`**: Assumed average minutes (15.0) for players who get some minutes but rarely start.
-
-* **`DEFAULT_UNKNOWN_PLAYER_MINUTES`**: Very low default minutes (1.0) for players with almost no historical data.
-
-* **`XP_CONFIDENCE_FACTORS`**: Scale factors applied to xP based on historical minutes:
-  - 0.25x for players with very low minutes (<450)
-  - 0.50x for players with low minutes (<2500)
-  - 1.00x for proven players (≥2500 minutes)
+* **`XP_CONFIDENCE_FACTORS`**:
+  * Very low minutes (<450): 0.25x
+  * Low minutes (<2500): 0.50x
+  * Proven (≥2500): 1.00x
 
 ## 📊 Output
 
@@ -159,10 +159,7 @@ Team B    2
 
 ## 💡 Future Improvements
 
-* **Improved Data Source:** The FPL API is limited in the type of data it provides, we cannot really calculate defensive contributions.
-
-* **Captaincy and Vice-Captaincy Selection:** Integrate logic to select the best captain and vice-captain for double points.
-
-* **Transfer Optimization:** Add functionality to suggest optimal transfers week-to-week, considering free transfers and hits.
-
-* **Chip Uses:** Chip usage is currently not a feature.
+* **Improved Data Source:** The FPL API is limited in the type of data it provides, we cannot really calculate defensive contributions
+* **Captaincy and Vice-Captaincy Selection:** Integrate logic to select the best captain and vice-captain for double points
+* **Transfer Optimization:** Add functionality to suggest optimal transfers week-to-week, considering free transfers and hits
+* **Chip Uses:** Chip usage is currently not a feature

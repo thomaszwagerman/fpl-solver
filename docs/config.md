@@ -60,18 +60,6 @@ These probabilities are used in the xP calculation for rare negative events.
 
   * **Default:** `0.002`
 
-## Heuristic Probabilities for Defensive Contribution Points
-
-These are internal model parameters used to estimate the likelihood of players achieving the new defensive contribution point thresholds, if direct event data is not available from the FPL API.
-
-* `CBIT_DEF_PROB`: Heuristic probability for defenders/goalkeepers to accumulate 10 or more Clearances, Blocks, Interceptions (CBI) & Tackles.
-
-  * **Default:** `0.3`
-
-* `CBIRT_MID_FWD_PROB`: Heuristic probability for midfielders/forwards to accumulate 12 or more Clearances, Blocks, Interceptions (CBI), Tackles & Recoveries.
-
-  * **Default:** `0.15`
-
 ## Default Expected Minutes
 
 * `DEFAULT_SUB_MINUTES`: Default average minutes assigned to players who typically come on as substitutes.
