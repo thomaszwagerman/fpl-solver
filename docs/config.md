@@ -76,11 +76,24 @@ These are internal model parameters used to estimate the likelihood of players a
 
 * `DEFAULT_SUB_MINUTES`: Default average minutes assigned to players who typically come on as substitutes.
 
-  * **Default:** `30.0`
+  * **Default:** `15.0`
 
 * `DEFAULT_UNKNOWN_PLAYER_MINUTES`: Default expected minutes for new players or those with very sparse historical data.
 
-  * **Default:** `10.0`
+  * **Default:** `1.0`
+
+## xP Confidence Factors
+
+These factors are applied to scale expected points based on a player's historical minutes, helping to discourage selection of unproven players.
+
+* `very_low_minutes`: Applied to players with less than `VERY_LOW_MINUTES_THRESHOLD` minutes.
+  * **Default:** `0.25` (reduces xP by 75%)
+
+* `low_minutes`: Applied to players with less than `MIN_MINUTES_THRESHOLD` minutes.
+  * **Default:** `0.5` (reduces xP by 50%)
+
+* `proven`: Applied to players with more than `MIN_MINUTES_THRESHOLD` minutes.
+  * **Default:** `1.0` (no reduction)
 
 ## Solver Configuration
 

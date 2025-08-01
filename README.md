@@ -36,11 +36,13 @@ The project is structured into three main components:
 
 2. **`xp_predictor.py`**:
    This code calculates expected points (xP) for each player over the next few gameweeks. It accounts for:
-   - Minutes played probability
+   - Minutes played probability (with confidence adjustments based on historical minutes)
    - Clean sheet probability
    - Goal-scoring probability
    - Assist probability
    - Bonus points probability
+   - Defensive contributions (new for 2025/26 season)
+   - Historical reliability (reduces xP for unproven players)
 
 3. **`solver.py`**:
    This is the core optimization engine. It takes the xP-calculated player data from `xp_predictor.py` and:
@@ -114,9 +116,14 @@ All key parameters are located in `config.py`. You can modify these values to ex
 
 * `YELLOW_CARD_PROB`, `RED_CARD_PROB`, `PENALTY_MISS_PROB`, **`OWN_GOAL_PROB`**: Heuristic probabilities for negative events.
 
-* **`DEFAULT_SUB_MINUTES`**: Assumed average minutes for players who get some minutes but rarely start.
+* **`DEFAULT_SUB_MINUTES`**: Assumed average minutes (15.0) for players who get some minutes but rarely start.
 
-* **`DEFAULT_UNKNOWN_PLAYER_MINUTES`**: Very low default minutes for players with almost no historical data.
+* **`DEFAULT_UNKNOWN_PLAYER_MINUTES`**: Very low default minutes (1.0) for players with almost no historical data.
+
+* **`XP_CONFIDENCE_FACTORS`**: Scale factors applied to xP based on historical minutes:
+  - 0.25x for players with very low minutes (<450)
+  - 0.50x for players with low minutes (<2500)
+  - 1.00x for proven players (≥2500 minutes)
 
 ## 📊 Output
 
