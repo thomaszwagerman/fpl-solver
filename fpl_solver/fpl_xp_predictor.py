@@ -1,7 +1,43 @@
+"""
+FPL Expected Points (xP) Predictor Module.
+
+This module provides functionality to predict Fantasy Premier League (FPL) points
+for players based on historical data, team strengths, and fixture difficulty.
+"""
+
 import math
+import sys
 import requests
 import time
 from datetime import datetime
+from typing import Dict, List, Optional, Union, Tuple
+import logging
+import sys
+
+def setup_logger(name: str, level: Optional[int] = None) -> logging.Logger:
+    """
+    Set up a logger with consistent formatting and optional level override.
+    
+    Args:
+        name: The name of the logger
+        level: Optional logging level override. If None, uses INFO
+        
+    Returns:
+        logging.Logger: Configured logger instance
+    """
+    logger = logging.getLogger(name)
+    
+    if not logger.handlers:  # Only add handler if logger doesn't have one
+        handler = logging.StreamHandler(sys.stdout)
+        formatter = logging.Formatter(
+            '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+            datefmt='%Y-%m-%d %H:%M:%S'
+        )
+        handler.setFormatter(formatter)
+        logger.addHandler(handler)
+    
+    logger.setLevel(level or logging.INFO)
+    return logger
 
 # Import configurations from the new config file
 from fpl_config import (
@@ -26,166 +62,277 @@ class FPLPredictor:
     """
     Predictive algorithm for Expected Points (xP) in Fantasy Premier League,
     using real data from the FPL API.
+    
+    This class handles:
+    - Fetching and processing FPL API data
+    - Calculating expected points based on multiple factors
+    - Managing player exclusions and filtering
+    - Providing fixture and player data for optimization
+    
+    Attributes:
+        gameweeks_to_predict (int): Number of future gameweeks to analyze
+        players_data (Dict): Player statistics and information
+        teams_data (Dict): Team statistics and attributes
+        fixtures_data (Dict): Upcoming and historical match data
+        all_players_xp_calculated_data (List): Processed xP calculations
     """
 
     def __init__(self, gameweeks_to_predict: int = 1):
         """
-        Initializes the FPLPredictor with default FPL point rules and
-        data structures, then fetches real data and calculates xP for all players.
+        Initialize the FPLPredictor with data structures and fetch initial data.
 
         Args:
-            gameweeks_to_predict (int): The number of upcoming gameweeks to calculate
-                                        expected points for. Default is 1 (next gameweek).
+            gameweeks_to_predict: Number of upcoming gameweeks to calculate
+                                expected points for. Default is 1 (next gameweek).
+        
+        Raises:
+            ValueError: If gameweeks_to_predict is not a positive integer
         """
+        self.logger = setup_logger(__name__)
         if not isinstance(gameweeks_to_predict, int) or gameweeks_to_predict < 1:
-            raise ValueError("gameweeks_to_predict must be a positive integer.")
+            msg = f"gameweeks_to_predict must be a positive integer, got {gameweeks_to_predict}"
+            self.logger.error(msg)
+            raise ValueError(msg)
+            
         self.gameweeks_to_predict = gameweeks_to_predict
+        self.logger.info(f"Initializing FPL Predictor for {gameweeks_to_predict} gameweek(s)")
 
-        self.fpl_points = FPL_POINTS
-
-        self.players_data = {}
-        self.teams_data = {}
-        self.fixtures_data = {}
-        self.position_definitions = {
+        # Configuration and static data
+        self.fpl_points: Dict[str, float] = FPL_POINTS
+        self.position_definitions: Dict[int, str] = {
             1: "GK",
             2: "DEF",
             3: "MID",
             4: "FWD",
         }
-        self.all_players_xp_calculated_data = (
-            []
-        )  # To store xP for all players for the optimizer
 
-        self._fetch_fpl_data()
-        self._calculate_all_players_xp()  # Calculate xP for all players after data is loaded
+        # Data structures for FPL information
+        self.players_data: Dict[int, Dict] = {}
+        self.teams_data: Dict[int, Dict] = {}
+        self.fixtures_data: Dict[int, Dict] = {}
+        self.all_players_xp_calculated_data: List[Dict] = []
 
-    def _fetch_fpl_data(self):
-        """Fetches initial data from the FPL API."""
-        print("Fetching FPL data...")
+        # Initialize data
         try:
-            # Fetch general data
-            static_data = requests.get(
-                "https://fantasy.premierleague.com/api/bootstrap-static/"
-            ).json()
-            # Fetch fixtures data
-            fixtures_data = requests.get(
-                "https://fantasy.premierleague.com/api/fixtures/"
-            ).json()
+            self._fetch_fpl_data()
+            self._calculate_all_players_xp()
+        except Exception as e:
+            self.logger.error(f"Failed to initialize FPL Predictor: {str(e)}")
+            raise
 
-            # Process players data
-            for element in static_data["elements"]:
-                player_id = element["id"]
-                self.players_data[player_id] = {
-                    "name": element["first_name"] + " " + element["second_name"],
-                    "web_name": element["web_name"],
-                    "team_id": element["team"],
-                    "element_type": element["element_type"],
-                    "position": self.position_definitions.get(
-                        element["element_type"], "Unknown"
-                    ),
-                    "cost_pence": element["now_cost"],
-                    "status": element["status"],
-                    "news": element["news"],
-                    "total_points": element["total_points"],
-                    "minutes": element["minutes"],
-                    "goals_scored": element["goals_scored"],
-                    "assists": element["assists"],
-                    "clean_sheets": element["clean_sheets"],
-                    "goals_conceded": element["goals_conceded"],
-                    "penalties_saved": element["penalties_saved"],
-                    "penalties_missed": element["penalties_missed"],
-                    "yellow_cards": element["yellow_cards"],
-                    "red_cards": element["red_cards"],
-                    "own_goals": element["own_goals"],
-                    "saves": element["saves"],
-                    "bonus": element["bonus"],
-                    "bps": element["bps"],
-                    "threat": element["threat"],
-                    "creativity": element["creativity"],
-                    "influence": element["influence"],
-                    "form": float(element["form"]),
-                    "points_per_game": float(element["points_per_game"]),
-                    "value_season": float(element["value_season"]),
-                    "value_form": float(element["value_form"]),
-                    "ict_index": float(element["ict_index"]),
-                }
-
-            # --- Apply Player Exclusions ---
-            initial_player_count = len(self.players_data)
-            players_to_keep = {}
-            for player_id, player_info in self.players_data.items():
-                # Exclude by ID
-                if player_id in EXCLUDED_PLAYERS_BY_ID:
-                    print(
-                        f"Excluding player by ID: {player_info['name']} (ID: {player_id})"
-                    )
-                    continue
-
-                # Exclude by Name
-                if player_info["name"] in EXCLUDED_PLAYERS_BY_NAME:
-                    print(
-                        f"Excluding player by Name: {player_info['name']} (ID: {player_id})"
-                    )
-                    continue
-
-                # Exclude by Team and Position
-                excluded_by_team_pos = False
-                for exclusion_rule in EXCLUDED_PLAYERS_BY_TEAM_AND_POSITION:
-                    team_name = self.teams_data.get(player_info["team_id"], {}).get(
-                        "name"
-                    )
-                    if team_name == exclusion_rule.get("team") and player_info[
-                        "position"
-                    ] == exclusion_rule.get("position"):
-                        print(
-                            f"Excluding player by Team/Position: {player_info['name']} ({team_name}, {player_info['position']})"
-                        )
-                        excluded_by_team_pos = True
-                        break
-                if excluded_by_team_pos:
-                    continue
-
-                players_to_keep[player_id] = player_info
-
-            self.players_data = players_to_keep
-            print(
-                f"Filtered {initial_player_count - len(self.players_data)} players. Remaining: {len(self.players_data)}"
+    def _fetch_fpl_data(self) -> None:
+        """
+        Fetch and process data from the FPL API.
+        
+        This method retrieves player, team, and fixture data from the FPL API,
+        processes it, and stores it in the appropriate data structures. It also
+        applies any configured player exclusions.
+        
+        Raises:
+            requests.RequestException: If API requests fail
+            ValueError: If required data is missing from API response
+            Exception: For other unexpected errors
+        """
+        self.logger.info("Fetching FPL data from API...")
+        
+        try:
+            # Fetch data with timeout and error handling
+            def fetch_api_data(url: str, endpoint: str) -> dict:
+                try:
+                    response = requests.get(url, timeout=10)
+                    response.raise_for_status()
+                    return response.json()
+                except requests.RequestException as e:
+                    self.logger.error(f"Failed to fetch {endpoint} data: {str(e)}")
+                    raise
+            
+            # Fetch both endpoints
+            static_data = fetch_api_data(
+                "https://fantasy.premierleague.com/api/bootstrap-static/",
+                "static"
+            )
+            fixtures_data = fetch_api_data(
+                "https://fantasy.premierleague.com/api/fixtures/",
+                "fixtures"
             )
 
+            # Process players data
+            if "elements" not in static_data:
+                raise ValueError("No player elements found in API response")
+                
+            self.logger.info(f"Processing {len(static_data['elements'])} players...")
+            
+            def process_player_data(element: Dict) -> Tuple[int, Dict]:
+                """Helper function to process individual player data"""
+                try:
+                    player_id = element["id"]
+                    return player_id, {
+                        "name": f"{element['first_name']} {element['second_name']}",
+                        "web_name": element["web_name"],
+                        "team_id": element["team"],
+                        "element_type": element["element_type"],
+                        "position": self.position_definitions.get(
+                            element["element_type"], "Unknown"
+                        ),
+                        "cost_pence": element["now_cost"],
+                        "status": element["status"],
+                        "news": element["news"],
+                        "total_points": element["total_points"],
+                        "minutes": element["minutes"],
+                        "goals_scored": element["goals_scored"],
+                        "assists": element["assists"],
+                        "clean_sheets": element["clean_sheets"],
+                        "goals_conceded": element["goals_conceded"],
+                        "penalties_saved": element["penalties_saved"],
+                        "penalties_missed": element["penalties_missed"],
+                        "yellow_cards": element["yellow_cards"],
+                        "red_cards": element["red_cards"],
+                        "own_goals": element["own_goals"],
+                        "saves": element["saves"],
+                        "bonus": element["bonus"],
+                        "bps": element["bps"],
+                        "threat": float(element.get("threat", 0)),
+                        "creativity": float(element.get("creativity", 0)),
+                        "influence": float(element.get("influence", 0)),
+                        "form": float(element.get("form", 0)),
+                        "points_per_game": float(element.get("points_per_game", 0)),
+                        "value_season": float(element.get("value_season", 0)),
+                        "value_form": float(element.get("value_form", 0)),
+                        "ict_index": float(element.get("ict_index", 0)),
+                    }
+                except KeyError as e:
+                    self.logger.warning(f"Missing required field for player: {str(e)}")
+                    return None
+                except ValueError as e:
+                    self.logger.warning(f"Invalid numeric value for player {element.get('id')}: {str(e)}")
+                    return None
+            
+            # Process all players with error handling
+            for element in static_data["elements"]:
+                result = process_player_data(element)
+                if result:
+                    player_id, player_data = result
+                    self.players_data[player_id] = player_data
+
+            # Apply Player Exclusions
+            def apply_player_exclusions() -> Dict[int, Dict]:
+                """Apply configured player exclusions and return filtered player data"""
+                initial_count = len(self.players_data)
+                players_to_keep = {}
+                
+                for player_id, player_info in self.players_data.items():
+                    # Track exclusion reason if player is excluded
+                    exclusion_reason = None
+                    
+                    # Check ID exclusions
+                    if player_id in EXCLUDED_PLAYERS_BY_ID:
+                        exclusion_reason = f"ID exclusion: {player_id}"
+                    
+                    # Check name exclusions
+                    elif player_info["name"] in EXCLUDED_PLAYERS_BY_NAME:
+                        exclusion_reason = f"Name exclusion: {player_info['name']}"
+                    
+                    # Check team/position exclusions
+                    else:
+                        team_name = self.teams_data.get(player_info["team_id"], {}).get("name")
+                        for rule in EXCLUDED_PLAYERS_BY_TEAM_AND_POSITION:
+                            if (team_name == rule.get("team") and 
+                                player_info["position"] == rule.get("position")):
+                                exclusion_reason = f"Team/Position exclusion: {team_name}/{player_info['position']}"
+                                break
+                    
+                    # Log exclusion or keep player
+                    if exclusion_reason:
+                        self.logger.info(
+                            f"Excluding player {player_info['name']} - {exclusion_reason}"
+                        )
+                    else:
+                        players_to_keep[player_id] = player_info
+                
+                filtered_count = len(players_to_keep)
+                self.logger.info(
+                    f"Player filtering complete. {initial_count - filtered_count} "
+                    f"players excluded. {filtered_count} players remaining."
+                )
+                return players_to_keep
+            
+            self.players_data = apply_player_exclusions()
+
             # Process teams data
+            if "teams" not in static_data:
+                raise ValueError("No team data found in API response")
+                
+            self.logger.info(f"Processing {len(static_data['teams'])} teams...")
+            
+            def process_team_data(team: Dict) -> Tuple[int, Dict]:
+                """Helper function to process individual team data"""
+                try:
+                    return team["id"], {
+                        "name": team["name"],
+                        "short_name": team["short_name"],
+                        "strength": team["strength"],
+                        "strength_overall_home": team["strength_overall_home"],
+                        "strength_overall_away": team["strength_overall_away"],
+                        "strength_attack_home": team["strength_attack_home"],
+                        "strength_attack_away": team["strength_attack_away"],
+                        "strength_defence_home": team["strength_defence_home"],
+                        "strength_defence_away": team["strength_defence_away"],
+                    }
+                except KeyError as e:
+                    self.logger.warning(f"Missing required field for team: {str(e)}")
+                    return None
+            
+            # Process all teams with error handling
             for team in static_data["teams"]:
-                self.teams_data[team["id"]] = {
-                    "name": team["name"],
-                    "short_name": team["short_name"],
-                    "strength": team["strength"],
-                    "strength_overall_home": team["strength_overall_home"],
-                    "strength_overall_away": team["strength_overall_away"],
-                    "strength_attack_home": team["strength_attack_home"],
-                    "strength_attack_away": team["strength_attack_away"],
-                    "strength_defence_home": team["strength_defence_home"],
-                    "strength_defence_away": team["strength_defence_away"],
-                }
-
+                result = process_team_data(team)
+                if result:
+                    team_id, team_data = result
+                    self.teams_data[team_id] = team_data
+            
             # Process fixtures data
+            self.logger.info(f"Processing {len(fixtures_data)} fixtures...")
+            
+            def process_fixture_data(fixture: Dict) -> Tuple[int, Dict]:
+                """Helper function to process individual fixture data"""
+                try:
+                    fixture_id = fixture["id"]
+                    # Validate required fields
+                    required_fields = ["team_h", "team_a", "event", "finished"]
+                    if not all(field in fixture for field in required_fields):
+                        missing = [f for f in required_fields if f not in fixture]
+                        raise KeyError(f"Missing required fields: {', '.join(missing)}")
+                    return fixture_id, fixture
+                except KeyError as e:
+                    self.logger.warning(f"Invalid fixture data: {str(e)}")
+                    return None
+            
+            # Process all fixtures with error handling
             for fixture in fixtures_data:
-                self.fixtures_data[fixture["id"]] = fixture
-
-            print("FPL data fetched successfully.")
+                result = process_fixture_data(fixture)
+                if result:
+                    fixture_id, fixture_data = result
+                    self.fixtures_data[fixture_id] = fixture_data
+            
+            self.logger.info("FPL data fetched and processed successfully.")
 
         except requests.exceptions.RequestException as e:
-            print(f"Error fetching FPL data: {e}")
-            self.players_data = {}
-            self.teams_data = {}
-            self.fixtures_data = {}
-            print("Initialization failed due to data fetching error. Exiting.")
-            sys.exit(1)
+            self.logger.error(f"Failed to fetch FPL data: {str(e)}")
+            self._reset_data_structures()
+            raise
+        except ValueError as e:
+            self.logger.error(f"Invalid data received from FPL API: {str(e)}")
+            self._reset_data_structures()
+            raise
         except Exception as e:
-            print(f"An unexpected error occurred during data fetching: {e}")
-            self.players_data = {}
-            self.teams_data = {}
-            self.fixtures_data = {}
-            print("Initialization failed due to unexpected error. Exiting.")
-            sys.exit(1)
+            self.logger.error(f"Unexpected error during data processing: {str(e)}")
+            self._reset_data_structures()
+            raise
+    
+    def _reset_data_structures(self) -> None:
+        """Reset all data structures to empty state"""
+        self.players_data = {}
+        self.teams_data = {}
+        self.fixtures_data = {}
 
     def _get_team_strength(self, team_id, is_home):
         """Get team strength based on home/away status."""
