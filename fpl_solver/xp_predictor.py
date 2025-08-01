@@ -6,6 +6,7 @@ for players based on historical data, team strengths, and fixture difficulty.
 """
 
 import math
+import os
 import sys
 import requests
 import time
@@ -13,6 +14,8 @@ from datetime import datetime
 from typing import Dict, List, Optional, Union, Tuple
 import logging
 import sys
+# Local import instead of package import to avoid circular dependencies
+from .cache_manager import CacheManager
 
 def setup_logger(name: str, level: Optional[int] = None) -> logging.Logger:
     """
@@ -39,8 +42,8 @@ def setup_logger(name: str, level: Optional[int] = None) -> logging.Logger:
     logger.setLevel(level or logging.INFO)
     return logger
 
-# Import configurations from the new config file
-from fpl_config import (
+# Import configurations from config file
+from .config import (
     FPL_POINTS,
     MIN_MINUTES_THRESHOLD,
     VERY_LOW_MINUTES_THRESHOLD,
@@ -95,6 +98,10 @@ class FPLPredictor:
         self.gameweeks_to_predict = gameweeks_to_predict
         self.logger.info(f"Initializing FPL Predictor for {gameweeks_to_predict} gameweek(s)")
 
+        # Initialize cache manager
+        cache_dir = os.path.join(os.path.dirname(__file__), 'cache')
+        self.cache_manager = CacheManager(cache_dir)
+        
         # Configuration and static data
         self.fpl_points: Dict[str, float] = FPL_POINTS
         self.position_definitions: Dict[int, str] = {
@@ -134,12 +141,25 @@ class FPLPredictor:
         self.logger.info("Fetching FPL data from API...")
         
         try:
-            # Fetch data with timeout and error handling
+            # Helper function to fetch from API with caching
             def fetch_api_data(url: str, endpoint: str) -> dict:
+                # Try to get from cache first
+                cached_data = self.cache_manager.get_cached_response(endpoint)
+                if cached_data is not None:
+                    self.logger.info(f"Using cached {endpoint} data")
+                    return cached_data
+                
+                # If not in cache or expired, fetch from API
                 try:
+                    self.logger.info(f"Fetching {endpoint} data from API")
                     response = requests.get(url, timeout=10)
                     response.raise_for_status()
-                    return response.json()
+                    data = response.json()
+                    
+                    # Cache the response
+                    self.cache_manager.save_response(endpoint, data)
+                    return data
+                    
                 except requests.RequestException as e:
                     self.logger.error(f"Failed to fetch {endpoint} data: {str(e)}")
                     raise
@@ -773,6 +793,14 @@ class FPLPredictor:
         formatted for the FPLOptimizer.
         """
         return self.all_players_xp_calculated_data
+        
+    def clear_cache(self):
+        """
+        Clear all cached API responses. Use this when you want to force fresh data
+        from the FPL API.
+        """
+        self.cache_manager.clear_cache()
+        self.logger.info("Cleared API response cache")
 
 
 # Example Usage (for testing this module independently if needed)

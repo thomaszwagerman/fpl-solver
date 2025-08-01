@@ -28,22 +28,22 @@ because FPL do not provide any sensible data from which this can be deduced.
 
 The project is structured into three main components:
 
-1. **`fpl_config.py`**:
-   This file centralizes all configurable parameters for the predictor and the optimizer. You can adjust FPL point values, minute thresholds for xP calculation, the optimization horizon (number of gameweeks), total budget, and the maximum players allowed per team here.
+1. **`config.py`**:
+   This file contains all the configuration variables needed by the solver and predictor, including:
+   - FPL scoring rules
+   - Player statistics
+   - Squad constraints
 
-2. **`fpl_xp_predictor.py`**:
-   This module is responsible for:
+2. **`xp_predictor.py`**:
+   This code calculates expected points (xP) for each player over the next few gameweeks. It accounts for:
+   - Minutes played probability
+   - Clean sheet probability
+   - Goal-scoring probability
+   - Assist probability
+   - Bonus points probability
 
-   * Fetching raw FPL data from the API.
-
-   * Processing team and fixture data, including calculating team strengths and incorporating FDR.
-
-   * Calculating each player's Expected Points (xP) for upcoming gameweeks. This involves logic for goals, assists, clean sheets, saves (for GKs), bonus points (using BPS as a proxy), and minor negative events like cards.
-
-   * Crucially, it includes refined logic for `expected_minutes` to accurately assess playing time, especially for players with limited past appearances.
-
-3. **`fpl_solver.py`**:
-   This is the core optimization engine. It takes the xP-calculated player data from `fpl_xp_predictor.py` and:
+3. **`solver.py`**:
+   This is the core optimization engine. It takes the xP-calculated player data from `xp_predictor.py` and:
 
    * Sets up an Integer Linear Programming (ILP) problem using the `PuLP` library.
 
@@ -83,14 +83,14 @@ To get the FPL Squad Optimizer running on your local machine, follow these steps
 Once you have set up the environment and installed the dependencies, you can run the optimizer from your terminal:
 
 ```
-python fpl_solver.py
+python run_solver.py
 ```
 
 The script will:
 
 1. Initialize the FPL Predictor to fetch the latest data.
 
-2. Calculate expected points for all players over the number of gameweeks specified in `fpl_config.py`.
+2. Calculate expected points for all players over the number of gameweeks specified in `config.py`.
 
 3. Run the optimization solver.
 
@@ -98,7 +98,7 @@ The script will:
 
 ## ⚙️ Configuration
 
-All key parameters are located in `fpl_config.py`. You can modify these values to experiment with different scenarios:
+All key parameters are located in `config.py`. You can modify these values to experiment with different scenarios:
 
 * **`OPTIMIZATION_GAMEWEEKS`**: The number of upcoming gameweeks the solver should consider for xP calculation (e.g., `1` for the next gameweek, `3` for the next three).
 

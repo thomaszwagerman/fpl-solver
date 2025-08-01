@@ -1,23 +1,35 @@
+"""
+FPL Squad Optimizer using PuLP for Integer Linear Programming (ILP).
+
+This module provides optimization functionality to select the best possible
+FPL squad over multiple gameweeks, considering transfer constraints and chips.
+"""
+
 import pandas as pd
-from pulp import *
-import sys
-import os
+from pulp import (
+    LpProblem,
+    LpMaximize,
+    LpVariable,
+    LpBinary,
+    LpInteger,
+    LpContinuous,
+    lpSum,
+    PULP_CBC_CMD,
+    value,
+    LpStatus,
+)
 
-# Import the FPLPredictor module to get real-time data and xP
-from fpl_xp_predictor import FPLPredictor
-
-# Import configurations from the new config file
-from fpl_config import (
-    OPTIMIZATION_GAMEWEEKS,
-    BUDGET,
-    MAX_PLAYERS_PER_TEAM,
+# Import configurations from config file
+from .config import (
     CHIP_ALLOWANCES,
-    INITIAL_FREE_TRANSFERS,
-    MAX_FREE_TRANSFERS_SAVED,
-    POINTS_PER_HIT,
+    BUDGET,
     ENFORCED_PLAYERS_BY_ID,
     ENFORCED_PLAYERS_BY_NAME,
     ENFORCED_PLAYERS_BY_TEAM_AND_POSITION,
+    MAX_FREE_TRANSFERS_SAVED,
+    INITIAL_FREE_TRANSFERS,
+    POINTS_PER_HIT,
+    MAX_PLAYERS_PER_TEAM,
 )
 
 
@@ -970,96 +982,5 @@ class FPLOptimizer:
             print("-----------------------------------")
 
 
-# Main execution block
-if __name__ == "__main__":
-    print("Initializing FPL Predictor to fetch data and calculate xP...")
-    # Use OPTIMIZATION_GAMEWEEKS from fpl_config.py
-    # This will now fetch xP for multiple upcoming gameweeks.
-    predictor = FPLPredictor(gameweeks_to_predict=OPTIMIZATION_GAMEWEEKS)
-
-    # Get the prepared player data from the predictor
-    all_players_for_solver = predictor.get_players_for_optimizer()
-
-    if not all_players_for_solver:
-        print("No player data with calculated xP available. Cannot run optimizer.")
-        sys.exit(1)
-
-    # Convert the list of dictionaries to a pandas DataFrame
-    player_data_for_solver = pd.DataFrame(all_players_for_solver)
-
-    # Store the initial number of players before filtering
-    initial_player_count = len(player_data_for_solver)
-
-    # Filter out players with 0 expected points in *all* gameweeks or very low cost
-    # Need to check if 'expected_points_by_gw' dictionary has any non-zero values
-    player_data_for_solver["total_xp_sum"] = player_data_for_solver[
-        "expected_points_by_gw"
-    ].apply(lambda x: sum(x.values()))
-    player_data_for_solver = player_data_for_solver[
-        (player_data_for_solver["total_xp_sum"] > 0)
-        | (
-            player_data_for_solver["cost"] >= 4.0
-        )  # Keep cheap, non-0xp players for bench filling
-    ]
-    # Re-evaluate the cost filter: a cheap player with 0 XP might still be useful as a bench filler
-    # Let's keep players if their cost is reasonable, even if initial XP is low.
-    player_data_for_solver = player_data_for_solver[
-        player_data_for_solver["cost"] >= 3.8
-    ]  # Min FPL cost for a playing player
-    player_data_for_solver = player_data_for_solver.drop(columns=["total_xp_sum"])
-
-    players_removed_count = initial_player_count - len(player_data_for_solver)
-    if players_removed_count > 0:
-        print(
-            f"Filtered {players_removed_count} players due to low expected points or cost before optimization."
-        )
-
-    if player_data_for_solver.empty:
-        print("No eligible players found after filtering. Cannot run optimizer.")
-        sys.exit(1)
-
-    print(
-        f"Prepared {len(player_data_for_solver)} players for optimization over {OPTIMIZATION_GAMEWEEKS} gameweek(s)."
-    )
-
-    # Initialize the optimizer with the fetched and processed player data
-    # The optimizer will now process and print messages for enforced players during its __init__
-    optimizer = FPLOptimizer(player_data_for_solver)
-
-    # Solve the problem using BUDGET, MAX_PLAYERS_PER_TEAM, CHIP_ALLOWANCES, and OPTIMIZATION_GAMEWEEKS
-    if optimizer.solve(
-        budget=BUDGET,
-        max_players_per_team=MAX_PLAYERS_PER_TEAM,
-        chip_allowances=CHIP_ALLOWANCES,
-        num_gameweeks=OPTIMIZATION_GAMEWEEKS,
-    ):
-        optimizer.print_overall_summary()
-
-        # Get the range of gameweeks optimized over from the history
-        if optimizer.selected_squad_history:
-            first_gw = min(
-                int(k.replace("GW", ""))
-                for k in optimizer.selected_squad_history.keys()
-            )
-            last_gw = max(
-                int(k.replace("GW", ""))
-                for k in optimizer.selected_squad_history.keys()
-            )
-            print("\n--- Detailed Squad Summary for Each Optimized Gameweek ---")
-            for gw_num in range(first_gw, last_gw + 1):
-                optimizer.print_squad_summary(gameweek=gw_num)
-        else:
-            print(
-                "\nNo detailed per-gameweek summary available as no optimal solution was found."
-            )
-
-    else:
-        print(
-            "Could not find an optimal FPL squad with the given parameters for multi-week optimization."
-        )
-        print(
-            "Consider adjusting the 'BUDGET', 'MAX_PLAYERS_PER_TEAM', 'CHIP_ALLOWANCES', or 'OPTIMIZATION_GAMEWEEKS'."
-        )
-        print(
-            "Also, review the player data to ensure enough eligible players are available in each category."
-        )
+# End of FPLOptimizer class
+# End of FPLOptimizer class

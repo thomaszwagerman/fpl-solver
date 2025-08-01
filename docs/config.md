@@ -1,6 +1,6 @@
 # Configuration
 
-The `fpl_config.py` file centralizes all configurable parameters for the FPL Expected Points Predictor and Solver. This allows for easy adjustment of FPL scoring rules, thresholds, and optimization settings without modifying the core logic of the predictor or optimizer.
+The `config.py` file centralizes all configurable parameters for the FPL Expected Points Predictor and Solver. This allows for easy adjustment of FPL scoring rules, thresholds, and optimization settings without modifying the core logic of the predictor or optimizer.
 
 ## FPL Point System (`FPL_POINTS`)
 
