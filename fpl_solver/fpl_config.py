@@ -3,7 +3,6 @@ fpl_config.py
 
 Configuration settings for the FPL Expected Points Predictor and Solver.
 This file centralizes all constants related to FPL scoring, thresholds, and optimization parameters.
-Updated for 2025/26 season rules based on user input for specific scoring changes.
 """
 
 # FPL Point System
@@ -26,6 +25,10 @@ FPL_POINTS = {
     "red_card_deduction": -3,  # For each red card
     "penalty_miss_deduction": -2,  # For each penalty miss
     "own_goal_deduction": -2,  # For each own goal
+    # Defensive Contribution Points for 2025/26 season
+    "defensive_contribution_points": 2,  # Points awarded for hitting threshold
+    "defensive_contribution_prob_def": 0.3,  # Heuristic probability for defenders/GKs to hit 10 CBIT
+    "defensive_contribution_prob_mid_fwd": 0.15,  # Heuristic probability for mids/fwds to hit 12 CBIRT
     # Bonus points factor is now more of a scaling for expected BPS score
     "bonus_points_scaling_factor": 0.005,  # A small factor to convert BPS score to expected bonus points (Model specific)
 }

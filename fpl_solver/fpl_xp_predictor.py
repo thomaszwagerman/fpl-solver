@@ -12,8 +12,8 @@ from fpl_config import (
     RED_CARD_PROB,
     PENALTY_MISS_PROB,
     OWN_GOAL_PROB,
-    CBIT_DEF_PROB,  # New import
-    CBIRT_MID_FWD_PROB,  # New import
+    CBIT_DEF_PROB,
+    CBIRT_MID_FWD_PROB,
     DEFAULT_SUB_MINUTES,
     DEFAULT_UNKNOWN_PLAYER_MINUTES,
     EXCLUDED_PLAYERS_BY_ID,
@@ -414,7 +414,7 @@ class FPLPredictor:
             xp += (expected_conceded / 2.0) * self.fpl_points[
                 "conceded_2_goals_deduction"
             ]
-        elif position == "MID":  # New for midfielders
+        elif position == "MID":
             xp += cs_prob * self.fpl_points["clean_sheet_mid"]
 
         # 5. Expected Saves (for GKs)
