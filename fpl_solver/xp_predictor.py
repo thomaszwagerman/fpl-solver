@@ -623,10 +623,9 @@ class FPLPredictor:
         )
         expected_defensive_contribution = (defensive_contribution_per_90 / 90.0) * expected_minutes
         
-        if position in ["GK", "DEF"]:
-            xp += expected_defensive_contribution * self.fpl_points["cbit_def_points"]
-        elif position in ["MID", "FWD"]:
-            xp += expected_defensive_contribution * self.fpl_points["cbirt_mid_fwd_points"]
+        # Award defensive contribution points based on position thresholds
+        if position in ["DEF", "MID", "FWD"]:  # Goalkeepers do not earn defensive contribution points
+            xp += expected_defensive_contribution * self.fpl_points["defensive_contribution_points"]
 
         # Apply confidence factor to final xP
         xp = xp * confidence_factor

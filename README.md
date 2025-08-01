@@ -10,7 +10,7 @@ This has obvious limitations compared to algorithms and solvers which can use pa
 configuration file.
 
 The introduction of **defensive contribution points** in 25/26, in particular, causes an issues
-because FPL do not provide any sensible data from which this can be deduced. 
+because the FPL API currently return '0' defensive contribution points, and does not provide any historic data. Once the season starts, these points will be taken into account by the algorithm
 
 ## ✨ Features
 

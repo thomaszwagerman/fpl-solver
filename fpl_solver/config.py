@@ -17,16 +17,14 @@ FPL_POINTS = {
     "clean_sheet_gk_def": 4,  # For a clean sheet by a goalkeeper or defender
     "clean_sheet_mid": 1,  # For a clean sheet by a midfielder (New for 2025/26 rules)
     "saves_3_points": 1,  # For every 3 shot saves by a goalkeeper
-    "cbit_def_points": 2,  # For accumulating 10 or more Clearances, Blocks, Interceptions (CBI) & Tackles (defenders)
-    "cbirt_mid_fwd_points": 2,  # For accumulating 12 or more Clearances, Blocks, Interceptions (CBI), Tackles & Recoveries (midfielders & forwards)
     "penalty_save_points": 5,  # For each penalty save
     "conceded_2_goals_deduction": -1,  # Per 2 goals conceded by a goalkeeper or defender
     "yellow_card_deduction": -1,  # For each yellow card
     "red_card_deduction": -3,  # For each red card
     "penalty_miss_deduction": -2,  # For each penalty miss
     "own_goal_deduction": -2,  # For each own goal
-    # Defensive Contribution Points for 2025/26 season
-    "defensive_contribution_points": 2,  # Points awarded for hitting threshold
+    # Defensive Contribution Points for 2025/26 season (10+ CBI & Tackles for DEF, 12+ CBI, Tackles & Recoveries for MID/FWD)
+    "defensive_contribution_points": 2,  # Points awarded for hitting defensive contribution threshold (GKs excluded)
     # Bonus points factor is now more of a scaling for expected BPS score
     "bonus_points_scaling_factor": 0.005,  # A small factor to convert BPS score to expected bonus points (Model specific)
 }
