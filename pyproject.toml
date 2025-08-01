@@ -26,9 +26,17 @@ dependencies = [
     "requests"
 ]
 
+[project.optional-dependencies]
+docs = [
+  "mkdocs",
+  "mkdocs-material",
+  "mkdocstrings[python]", 
+]
+
+
 [project.urls]
 "Homepage" = "https://github.com/yourusername/fpl-optimizer" # Replace with your GitHub URL
 "Bug Tracker" = "https://github.com/yourusername/fpl-optimizer/issues" # Replace with your GitHub URL
 
 [tool.setuptools.packages.find]
-where = ["src"] # Search for packages in the 'src' directory
+where = ["."] # Search for packages in the 'src' directory

@@ -1,0 +1,61 @@
+site_name: fpl-solver
+site_url: https://github.com/thomaszwagerman/fpl-solver  # Replace with your actual domain
+site_description: Documentation for the Fantasy Premier League Expected Points Predictor and Optimizer.
+
+theme:
+  name: material
+  palette:
+    # Palette toggle for light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    # Palette toggle for dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  font:
+    text: Inter
+    code: Fira Code
+  icon:
+    repo: fontawesome/brands/github
+
+repo_url: https://github.com/thomaszwagerman/fpl-solver
+repo_name: thomaszwagerman/fpl-solver
+edit_uri: edit/main/docs/
+
+nav:
+  - Home: index.md
+  - Configuration: fpl_config.md
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          paths:
+            - .
+          options:
+            show_submodules: true
+            docstring_style: google
+            heading_level: 3
+  - mkdocs-autoapi:
+      autoapi_add_nav_entry: API
+      autoapi_ignore:
+        - fpl_solver/fpl_config.py
+  - autorefs:
+      resolve_closest: true
+
+markdown_extensions:
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - attr_list
+  - md_in_html
