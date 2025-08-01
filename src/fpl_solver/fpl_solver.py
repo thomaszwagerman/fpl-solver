@@ -15,6 +15,9 @@ from fpl_config import (
     INITIAL_FREE_TRANSFERS,
     MAX_FREE_TRANSFERS_SAVED,
     POINTS_PER_HIT,
+    ENFORCED_PLAYERS_BY_ID,
+    ENFORCED_PLAYERS_BY_NAME,
+    ENFORCED_PLAYERS_BY_TEAM_AND_POSITION,
 )
 
 
@@ -52,6 +55,70 @@ class FPLOptimizer:
         self.total_cost = 0
         self.total_expected_points = 0
         self.total_transfer_hits = 0
+
+        # --- Process Enforced Players ---
+        self.enforced_player_indices = set()
+        self.enforced_team_pos_requirements = []
+
+        print("\n--- Processing Enforced Players ---")
+
+        # Enforce by Player ID
+        for player_id in ENFORCED_PLAYERS_BY_ID:
+            found_player = self.player_data[self.player_data["id"] == player_id]
+            if not found_player.empty:
+                player_idx = found_player.index[0]
+                self.enforced_player_indices.add(player_idx)
+                print(
+                    f"Enforcing player by ID: {found_player.loc[player_idx, 'name']} (ID: {player_id})"
+                )
+            else:
+                print(
+                    f"Warning: Enforced player with ID {player_id} not found in data."
+                )
+
+        # Enforce by Player Name
+        for player_name in ENFORCED_PLAYERS_BY_NAME:
+            found_player = self.player_data[self.player_data["name"] == player_name]
+            if not found_player.empty:
+                player_idx = found_player.index[0]
+                self.enforced_player_indices.add(player_idx)
+                print(f"Enforcing player by name: {player_name}")
+            else:
+                print(f"Warning: Enforced player '{player_name}' not found in data.")
+
+        # Enforce by Team and Position
+        for requirement in ENFORCED_PLAYERS_BY_TEAM_AND_POSITION:
+            team = requirement.get("team")
+            position = requirement.get("position")
+            if team and position:
+                # Validate team and position exist in data
+                if team not in self.player_data["team"].unique():
+                    print(
+                        f"Warning: Enforced team '{team}' for position '{position}' not found in data."
+                    )
+                    continue
+                if position not in self.player_data["position"].unique():
+                    print(
+                        f"Warning: Enforced position '{position}' for team '{team}' not found in data."
+                    )
+                    continue
+
+                self.enforced_team_pos_requirements.append((team, position))
+                print(f"Enforcing at least one {position} from {team}.")
+            else:
+                print(
+                    f"Warning: Invalid enforced team/position requirement: {requirement}"
+                )
+
+        if not (
+            self.enforced_player_indices
+            or self.enforced_team_pos_requirements
+            or ENFORCED_PLAYERS_BY_ID
+            or ENFORCED_PLAYERS_BY_NAME
+            or ENFORCED_PLAYERS_BY_TEAM_AND_POSITION
+        ):
+            print("No players or team/position combinations are enforced.")
+        print("-----------------------------------\n")
 
     def solve(
         self,
@@ -362,6 +429,29 @@ class FPLOptimizer:
                     captain_var[i][w] <= starting_xi_vars[i][w],
                     f"Captain_in_StartingXI_{i}_{w}",
                 )
+
+            # --- Enforced Player Constraints---
+            for player_idx in self.enforced_player_indices:
+                self.problem += (
+                    player_vars[player_idx][w] == 1,
+                    f"Enforce_Player_{self.player_data.loc[player_idx, 'name']}_GW{w}",
+                )
+
+            for team, position in self.enforced_team_pos_requirements:
+                # Filter players for the current team and position
+                team_pos_players = self.player_data[
+                    (self.player_data["team"] == team)
+                    & (self.player_data["position"] == position)
+                ].index
+                if not team_pos_players.empty:
+                    self.problem += (
+                        lpSum(player_vars[i][w] for i in team_pos_players) >= 1,
+                        f"Enforce_One_{position}_from_{team}_GW{w}",
+                    )
+                else:
+                    print(
+                        f"Warning: No players found for enforced requirement: at least one {position} from {team} for GW{gw_actual}."
+                    )
         # --- Chip Usage Constraints (TOTAL usage over all gameweeks) ---
         # These constraints should be outside the per-gameweek loop to avoid duplicates.
         self.problem += (
@@ -896,6 +986,9 @@ if __name__ == "__main__":
     # Convert the list of dictionaries to a pandas DataFrame
     player_data_for_solver = pd.DataFrame(all_players_for_solver)
 
+    # Store the initial number of players before filtering
+    initial_player_count = len(player_data_for_solver)
+
     # Filter out players with 0 expected points in *all* gameweeks or very low cost
     # Need to check if 'expected_points_by_gw' dictionary has any non-zero values
     player_data_for_solver["total_xp_sum"] = player_data_for_solver[
@@ -914,6 +1007,12 @@ if __name__ == "__main__":
     ]  # Min FPL cost for a playing player
     player_data_for_solver = player_data_for_solver.drop(columns=["total_xp_sum"])
 
+    players_removed_count = initial_player_count - len(player_data_for_solver)
+    if players_removed_count > 0:
+        print(
+            f"Filtered {players_removed_count} players due to low expected points or cost before optimization."
+        )
+
     if player_data_for_solver.empty:
         print("No eligible players found after filtering. Cannot run optimizer.")
         sys.exit(1)
@@ -923,6 +1022,7 @@ if __name__ == "__main__":
     )
 
     # Initialize the optimizer with the fetched and processed player data
+    # The optimizer will now process and print messages for enforced players during its __init__
     optimizer = FPLOptimizer(player_data_for_solver)
 
     # Solve the problem using BUDGET, MAX_PLAYERS_PER_TEAM, CHIP_ALLOWANCES, and OPTIMIZATION_GAMEWEEKS

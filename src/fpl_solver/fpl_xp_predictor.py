@@ -14,6 +14,9 @@ from fpl_config import (
     OWN_GOAL_PROB,
     DEFAULT_SUB_MINUTES,
     DEFAULT_UNKNOWN_PLAYER_MINUTES,
+    EXCLUDED_PLAYERS_BY_ID,
+    EXCLUDED_PLAYERS_BY_NAME,
+    EXCLUDED_PLAYERS_BY_TEAM_AND_POSITION,
 )
 
 
@@ -74,14 +77,12 @@ class FPLPredictor:
                     "name": element["first_name"] + " " + element["second_name"],
                     "web_name": element["web_name"],
                     "team_id": element["team"],
-                    "element_type": element["element_type"],  # Position ID
+                    "element_type": element["element_type"],
                     "position": self.position_definitions.get(
                         element["element_type"], "Unknown"
                     ),
                     "cost_pence": element["now_cost"],
-                    "status": element[
-                        "status"
-                    ],  # E.g., 'a' for available, 'i' for injured
+                    "status": element["status"],
                     "news": element["news"],
                     "total_points": element["total_points"],
                     "minutes": element["minutes"],
@@ -96,19 +97,48 @@ class FPLPredictor:
                     "own_goals": element["own_goals"],
                     "saves": element["saves"],
                     "bonus": element["bonus"],
-                    "bps": element["bps"],  # Bonus Points System score
+                    "bps": element["bps"],
                     "threat": element["threat"],
                     "creativity": element["creativity"],
                     "influence": element["influence"],
-                    "form": float(element["form"]),  # Player's form
+                    "form": float(element["form"]),
                     "points_per_game": float(element["points_per_game"]),
                     "value_season": float(element["value_season"]),
                     "value_form": float(element["value_form"]),
-                    # Additional stats for defensive contribution
-                    "ict_index": float(
-                        element["ict_index"]
-                    ),  # Influence, Creativity, Threat
+                    "ict_index": float(element["ict_index"]),
                 }
+
+            # --- Apply Player Exclusions ---
+            initial_player_count = len(self.players_data)
+            players_to_keep = {}
+            for player_id, player_info in self.players_data.items():
+                # Exclude by ID
+                if player_id in EXCLUDED_PLAYERS_BY_ID:
+                    print(f"Excluding player by ID: {player_info['name']} (ID: {player_id})")
+                    continue
+
+                # Exclude by Name
+                if player_info['name'] in EXCLUDED_PLAYERS_BY_NAME:
+                    print(f"Excluding player by Name: {player_info['name']} (ID: {player_id})")
+                    continue
+
+                # Exclude by Team and Position
+                excluded_by_team_pos = False
+                for exclusion_rule in EXCLUDED_PLAYERS_BY_TEAM_AND_POSITION:
+                    team_name = self.teams_data.get(player_info['team_id'], {}).get('name')
+                    if (team_name == exclusion_rule.get("team") and
+                        player_info['position'] == exclusion_rule.get("position")):
+                        print(f"Excluding player by Team/Position: {player_info['name']} ({team_name}, {player_info['position']})")
+                        excluded_by_team_pos = True
+                        break
+                if excluded_by_team_pos:
+                    continue
+
+                players_to_keep[player_id] = player_info
+
+            self.players_data = players_to_keep
+            print(f"Filtered {initial_player_count - len(self.players_data)} players. Remaining: {len(self.players_data)}")
+
 
             # Process teams data
             for team in static_data["teams"]:
