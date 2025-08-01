@@ -13,7 +13,6 @@ import time
 from datetime import datetime
 from typing import Dict, List, Optional, Union, Tuple
 import logging
-import sys
 # Local imports
 from .cache_manager import CacheManager
 from .logger import setup_logger
