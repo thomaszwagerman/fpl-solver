@@ -5,7 +5,7 @@ This project provides a Python-based solution to optimize Fantasy Premier League
 This project aims to provide a **free and open-source** xP prediction algorithm, that is directly
 integrated with a solver. It only uses freely available data from the FPL API.
 
-This has obvious limitations compared to algorithms and solvers which can use pay-walled data (such as Opta, FFH), but 
+This has obvious limitations compared to algorithms and solvers which can use pay-walled data (such as Opta, FFH), but
 we give the user flexibility to adjust the algorithm using a configuration file.
 
 ## ✨ Features
@@ -24,74 +24,73 @@ we give the user flexibility to adjust the algorithm using a configuration file.
 
 The project is structured into three main components:
 
-1.  **`fpl_config.py`**:
-    This file centralizes all configurable parameters for the predictor and the optimizer. You can adjust FPL point values, minute thresholds for xP calculation, the optimization horizon (number of gameweeks), total budget, and the maximum players allowed per team here.
+1. **`fpl_config.py`**:
+   This file centralizes all configurable parameters for the predictor and the optimizer. You can adjust FPL point values, minute thresholds for xP calculation, the optimization horizon (number of gameweeks), total budget, and the maximum players allowed per team here.
 
-2.  **`fpl_xp_predictor.py`**:
-    This module is responsible for:
+2. **`fpl_xp_predictor.py`**:
+   This module is responsible for:
 
-    * Fetching raw FPL data from the API.
+   * Fetching raw FPL data from the API.
 
-    * Processing team and fixture data, including calculating team strengths and incorporating FDR.
+   * Processing team and fixture data, including calculating team strengths and incorporating FDR.
 
-    * Calculating each player's Expected Points (xP) for upcoming gameweeks. This involves logic for goals, assists, clean sheets, saves (for GKs), bonus points (using BPS as a proxy), and minor negative events like cards.
+   * Calculating each player's Expected Points (xP) for upcoming gameweeks. This involves logic for goals, assists, clean sheets, saves (for GKs), bonus points (using BPS as a proxy), and minor negative events like cards.
 
-    * Crucially, it includes refined logic for `expected_minutes` to accurately assess playing time, especially for players with limited past appearances.
+   * Crucially, it includes refined logic for `expected_minutes` to accurately assess playing time, especially for players with limited past appearances.
 
-3.  **`fpl_solver.py`**:
-    This is the core optimization engine. It takes the xP-calculated player data from `fpl_xp_predictor.py` and:
+3. **`fpl_solver.py`**:
+   This is the core optimization engine. It takes the xP-calculated player data from `fpl_xp_predictor.py` and:
 
-    * Sets up an Integer Linear Programming (ILP) problem using the `PuLP` library.
+   * Sets up an Integer Linear Programming (ILP) problem using the `PuLP` library.
 
-    * Defines constraints for squad size (15 players), position counts (2 GKs, 5 DEFs, 5 MIDs, 3 FWDs), total budget, and maximum players per team.
+   * Defines constraints for squad size (15 players), position counts (2 GKs, 5 DEFs, 5 MIDs, 3 FWDs), total budget, and maximum players per team.
 
-    * Maximizes the total expected points of the selected squad.
+   * Maximizes the total expected points of the selected squad.
 
-    * Prints a detailed summary of the optimal squad, including costs and xP breakdown by position, and a team-by-team player count.
+   * Prints a detailed summary of the optimal squad, including costs and xP breakdown by position, and a team-by-team player count.
 
 ## 🛠️ Setup and Installation
 
 To get the FPL Squad Optimizer running on your local machine, follow these steps:
 
-1.  **Clone the Repository (if applicable):**
+1. **Clone the Repository (if applicable):**
 
-    ```bash
-    git clone git@github.com:thomaszwagerman/fpl-solver.git
-    cd fpl-solver
-    ```
+   ```
+   git clone git@github.com:thomaszwagerman/fpl-solver.git
+   cd fpl-solver
+   ```
 
-2.  **Create a Virtual Environment (Recommended):**
+2. **Create a Virtual Environment (Recommended):**
 
-    ```bash
-    python -m venv venv
-    source venv/bin/activate
-    ```
+   ```
+   python -m venv venv
+   source venv/bin/activate
+   ```
 
-3.  **Install locally:**
-    Install `fpl-solver` locally:
+3. **Install locally:**
+   Install `fpl-solver` locally:
 
-    ```bash
-    pip install .
-    ```
-
+   ```
+   pip install .
+   ```
 
 ## 🚀 Usage
 
 Once you have set up the environment and installed the dependencies, you can run the optimizer from your terminal:
 
-```bash
+```
 python fpl_solver.py
 ```
 
 The script will:
 
-1.  Initialize the FPL Predictor to fetch the latest data.
+1. Initialize the FPL Predictor to fetch the latest data.
 
-2.  Calculate expected points for all players over the number of gameweeks specified in `fpl_config.py`.
+2. Calculate expected points for all players over the number of gameweeks specified in `fpl_config.py`.
 
-3.  Run the optimization solver.
+3. Run the optimization solver.
 
-4.  Print the optimal 15-player squad, its total cost, and total expected points.
+4. Print the optimal 15-player squad, its total cost, and total expected points.
 
 ## ⚙️ Configuration
 
@@ -148,6 +147,7 @@ Team B    2
 ```
 
 ## 💡 Future Improvements
+
 * **Improved Data Source:** The FPL API is limited in the type of data it provides, we cannot really calculate defensive contributions.
 
 * **Captaincy and Vice-Captaincy Selection:** Integrate logic to select the best captain and vice-captain for double points.
