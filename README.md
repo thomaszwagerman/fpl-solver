@@ -5,8 +5,12 @@ This project provides a Python-based solution to optimize Fantasy Premier League
 This project aims to provide a **free and open-source** xP prediction algorithm, that is directly
 integrated with a solver. It only uses freely available data from the FPL API.
 
-This has obvious limitations compared to algorithms and solvers which can use pay-walled data (such as Opta, FFH), but
-we give the user flexibility to adjust the algorithm using a configuration file.
+This has obvious limitations compared to algorithms and solvers which can use pay-walled data
+(such as Opta, FBREF, FFH), but we give the user flexibility to adjust the algorithm using a
+configuration file.
+
+The introduction of **defensive contribution points** in 25/26, in particular, causes an issues
+because FPL do not provide any sensible data from which this can be deduced. 
 
 ## ✨ Features
 
