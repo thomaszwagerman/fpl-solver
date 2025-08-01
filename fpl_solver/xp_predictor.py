@@ -47,6 +47,7 @@ from .config import (
     FPL_POINTS,
     MIN_MINUTES_THRESHOLD,
     VERY_LOW_MINUTES_THRESHOLD,
+    XP_CONFIDENCE_FACTORS,
     YELLOW_CARD_PROB,
     RED_CARD_PROB,
     PENALTY_MISS_PROB,
@@ -516,6 +517,14 @@ class FPLPredictor:
             # Fallback if strength data is missing (shouldn't happen with robust data fetch)
             return {"xp": 0.0, "reason": "Team strength data missing for fixture."}
 
+        # Apply confidence factor based on historical minutes
+        minutes_played = player.get("minutes", 0)
+        confidence_factor = XP_CONFIDENCE_FACTORS["proven"]  # Default to proven player
+        if minutes_played < VERY_LOW_MINUTES_THRESHOLD:
+            confidence_factor = XP_CONFIDENCE_FACTORS["very_low_minutes"]
+        elif minutes_played < MIN_MINUTES_THRESHOLD:
+            confidence_factor = XP_CONFIDENCE_FACTORS["low_minutes"]
+
         # 1. Appearance points
         if expected_minutes >= 60:
             xp += self.fpl_points["appearance_points_gte_60"]
@@ -643,7 +652,10 @@ class FPLPredictor:
         elif position in ["MID", "FWD"]:
             xp += expected_defensive_contribution * self.fpl_points["cbirt_mid_fwd_points"]
 
-        return {"xp": round(xp, 2), "reason": "Success"}
+        # Apply confidence factor to final xP
+        xp = xp * confidence_factor
+        
+        return {"xp": round(xp, 2), "reason": "Success", "confidence": confidence_factor}
 
     def _calculate_all_players_xp(self):
         """

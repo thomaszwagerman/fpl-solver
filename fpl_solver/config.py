@@ -37,6 +37,14 @@ VERY_LOW_MINUTES_THRESHOLD = (
     450  # Players below this will have their per-90 stats effectively zeroed out
 )
 
+# xP confidence factor for players with limited minutes
+# This reduces expected points for unproven players to discourage picking them
+XP_CONFIDENCE_FACTORS = {
+    "very_low_minutes": 0.25,  # Player has < VERY_LOW_MINUTES_THRESHOLD minutes
+    "low_minutes": 0.5,      # Player has < MIN_MINUTES_THRESHOLD minutes
+    "proven": 1.0           # Player has >= MIN_MINUTES_THRESHOLD minutes
+}
+
 # Probabilities for minor negative events (used in xP calculation)
 YELLOW_CARD_PROB = 0.05
 RED_CARD_PROB = 0.005
@@ -45,13 +53,13 @@ OWN_GOAL_PROB = 0.002
 
 
 # Default average minutes for players with some minutes but no starts (e.g., regular subs)
-DEFAULT_SUB_MINUTES = 30.0
+DEFAULT_SUB_MINUTES = 15.0  # Reduced from 30.0 to be more conservative
 
 # Default expected minutes for new players or those with very sparse data
-DEFAULT_UNKNOWN_PLAYER_MINUTES = 10.0
+DEFAULT_UNKNOWN_PLAYER_MINUTES = 1.0  # Reduced from 10.0 to strongly discourage picking unproven players
 
 # --- Solver Configuration ---
-OPTIMIZATION_GAMEWEEKS = 3  # Number of upcoming gameweeks to optimize for
+OPTIMIZATION_GAMEWEEKS = 5  # Number of upcoming gameweeks to optimize for
 BUDGET = 100.0  # Total budget for the squad in millions of pounds
 MAX_PLAYERS_PER_TEAM = (
     3  # Maximum number of players allowed from any single Premier League team
@@ -62,7 +70,7 @@ MAX_PLAYERS_PER_TEAM = (
 CHIP_ALLOWANCES = {
     "free_hit": 0,
     "wildcard": 0,
-    "bench_boost": 1,
+    "bench_boost": 0,
     "triple_captain": 0,
 }
 
